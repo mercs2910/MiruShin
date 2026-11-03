@@ -17,7 +17,9 @@ enum ExternalPlayer {
   internalSoftware('MiruShin · программное декодирование'),
   vimu('Vimu'),
   mx('MX Player'),
-  mxSoftware('MX Player · программное декодирование');
+  mxSoftware('MX Player · программное декодирование'),
+  next('Next Player'),
+  nextSoftware('Next Player · программное декодирование');
 
   const ExternalPlayer(this.label);
   final String label;

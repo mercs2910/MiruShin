@@ -117,6 +117,7 @@ object ExternalPlayback {
         val pkg = when (target) {
             "vimu" -> "net.gtvbox.videoplayer"
             "mx", "mxSoftware" -> "com.mxtech.videoplayer.ad"
+            "next", "nextSoftware" -> "dev.anilbeesetti.nextplayer"
             else -> error("Этот плеер не поддерживается")
         }
         val uri = Uri.parse(call.argument<String>("url")!!)
@@ -131,13 +132,18 @@ object ExternalPlayback {
             intent.putExtra("forceresume", true)
         } else {
             // MX omits HTTP result callbacks without an explicit activity component.
-            intent.setClassName(pkg, "$pkg.ActivityScreen")
+            intent.setClassName(pkg, if (pkg == "dev.anilbeesetti.nextplayer")
+                "$pkg.feature.player.PlayerActivity" else "$pkg.ActivityScreen")
             intent.putExtra("title", title)
             intent.putExtra("position", position)
             intent.putExtra("return_result", true)
             intent.putExtra("video_list", arrayOf(uri))
             intent.putExtra("video_list_is_explicit", true)
-            if (target == "mxSoftware") intent.putExtra("decode_mode", 2.toByte())
+            intent.putExtra("sticky", false)
+            if (target == "mxSoftware" || target == "nextSoftware") intent.putExtra("decode_mode", 2.toByte())
+            if (pkg == "dev.anilbeesetti.nextplayer") {
+                intent.putExtra("playback_speed", (call.argument<Number>("playbackSpeed") ?: 1).toFloat())
+            }
             val headers = call.argument<Map<String, String>>("headers") ?: emptyMap()
             intent.putExtra("headers", headers.flatMap { listOf(it.key, it.value) }.toTypedArray())
         }
@@ -185,6 +191,9 @@ object ExternalPlayback {
                 ?: candidates.firstOrNull() ?: return
             val ps = c.playbackState ?: return
             if (ps.position < 0 || SystemClock.elapsedRealtime() - launch < 500) return
+            if (ps.state !in listOf(PlaybackState.STATE_PLAYING, PlaybackState.STATE_PAUSED,
+                    PlaybackState.STATE_BUFFERING, PlaybackState.STATE_CONNECTING)) return
+            if (!s.optBoolean("observed") && ps.state != PlaybackState.STATE_PLAYING) return
             controller = c
             val duration = c.metadata?.getLong(MediaMetadata.METADATA_KEY_DURATION) ?: 0L
             val playing = ps.state == PlaybackState.STATE_PLAYING
@@ -214,6 +223,7 @@ object ExternalPlayback {
         val completed = valid && if (vimu) resultCode == 1
             else resultCode == Activity.RESULT_OK && data?.getStringExtra("end_by") == "playback_completion"
         if (valid && data != null) {
+            if (data.hasExtra("decode_mode")) s.put("decoderMode", data.getByteExtra("decode_mode", 0.toByte()).toInt())
             if (data.hasExtra("position")) {
                 s.put("positionMs", data.getIntExtra("position", 0).coerceAtLeast(0))
                 s.put("observed", true)
@@ -239,7 +249,7 @@ object ExternalPlayback {
         s.put("updatedAtMs", System.currentTimeMillis())
         check(prefs(context).edit().putString(KEY, s.toString()).commit()) { "Не удалось сохранить позицию воспроизведения" }
         if (s.getJSONObject("context").optBoolean("diagnostics")) {
-            Log.i("MiruExternal", "saved positionMs=${s.optLong("positionMs")} durationMs=${s.optLong("durationMs")} revision=${s.optLong("revision")} observed=${s.optBoolean("observed")} completed=${s.optBoolean("completed")}")
+            Log.i("MiruExternal", "saved positionMs=${s.optLong("positionMs")} durationMs=${s.optLong("durationMs")} revision=${s.optLong("revision")} observed=${s.optBoolean("observed")} completed=${s.optBoolean("completed")} decoderMode=${s.optInt("decoderMode")}")
         }
         lastCommit = SystemClock.elapsedRealtime()
     }

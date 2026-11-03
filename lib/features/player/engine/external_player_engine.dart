@@ -73,6 +73,7 @@ class ExternalPlayerEngine extends PlayerEngine {
         _ => 'video/*',
       },
       'positionMs': (startAt ?? Duration.zero).inMilliseconds,
+      'playbackSpeed': _startupSpeed ?? 1,
       'context': context,
     });
     ExternalPlaybackBridge.attachedSessionId = _sessionId;

@@ -101,6 +101,7 @@
     <queries>
         <package android:name="net.gtvbox.videoplayer" />
         <package android:name="com.mxtech.videoplayer.ad" />
+        <package android:name="dev.anilbeesetti.nextplayer" />
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
