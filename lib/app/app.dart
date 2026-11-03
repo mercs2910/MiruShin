@@ -22,6 +22,7 @@ import '../features/library/application/canonical_library_repository.dart';
 import '../features/library/application/google_drive_sync_controller.dart';
 import '../features/metadata/application/metadata_cache_provider.dart';
 import '../features/player/application/playback_controller.dart';
+import '../features/player/application/external_playback.dart';
 import '../features/settings/application/settings_state.dart';
 import '../features/tracking/application/tracker_library_provider.dart';
 import '../features/tracking/application/tracker_reconciliation_lifecycle.dart';
@@ -88,6 +89,7 @@ class _MiruShinAppState extends ConsumerState<MiruShinApp> {
       MiruShinDeepLinkService.instance.markNavigationReady(_router);
     });
     _lifecycleListener = AppLifecycleListener(
+      onResume: () => ref.invalidate(externalPlaybackRecoveryProvider),
       onDetach: () => unawaited(_cleanupForExit()),
       onExitRequested: () async {
         await _cleanupForExit();
@@ -172,6 +174,7 @@ class _MiruShinAppState extends ConsumerState<MiruShinApp> {
     ref.watch(googleDriveSyncLifecycleProvider);
     ref.watch(trackerReconciliationLifecycleProvider);
     ref.watch(streamSelectionMigrationProvider);
+    ref.watch(externalPlaybackRecoveryProvider);
     PaintingBinding.instance.imageCache.maximumSizeBytes =
         settings.cacheLimitMb * 1024 * 1024;
     configureMiruShinArtworkCache(

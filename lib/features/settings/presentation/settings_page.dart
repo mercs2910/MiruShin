@@ -41,6 +41,7 @@ import '../../metadata/application/metadata_cache_provider.dart';
 import '../../metadata/application/metadata_providers.dart';
 import '../../metadata/data/tmdb_metadata_provider.dart';
 import '../../player/application/player_settings.dart';
+import '../../player/application/external_playback.dart';
 import '../../player/data/discord_rpc_service.dart';
 import '../../player/domain/player_models.dart';
 import '../../player/presentation/widgets/player_diagnostics_controls.dart';
@@ -2354,6 +2355,29 @@ class _PlayerEngineSection extends ConsumerWidget {
       title: context.t('Player'),
       icon: Icons.smart_display_rounded,
       children: <Widget>[
+        if (supportsExternalPlayback) ...<Widget>[
+          SettingsRow(
+            title: 'Плеєр на цьому пристрої',
+            subtitle: 'Відкривати серії у Vimu або MX Player. Вибір не змінює плеєр на Mac.',
+            trailing: DropdownButton<ExternalPlayer>(
+              value: ref.watch(externalPlayerProvider).value ?? ExternalPlayer.internal,
+              items: ExternalPlayer.values.map((value) => DropdownMenuItem(
+                value: value, child: Text(value.label),
+              )).toList(growable: false),
+              onChanged: (value) {
+                if (value != null) ref.read(externalPlayerProvider.notifier).select(value);
+              },
+            ),
+          ),
+          SettingsRow(
+            title: 'Збереження прогресу зовнішнього плеєра',
+            subtitle: 'Дозвольте доступ до сповіщень для позиції відтворення й автопропуску. Текст сповіщень не читається. Потрібна підтримка керування з боку плеєра.',
+            trailing: TextButton(
+              onPressed: ExternalPlaybackBridge.openAccessSettings,
+              child: const Text('Налаштувати'),
+            ),
+          ),
+        ],
         SettingsRow(
           title: context.t('Playback engine'),
           subtitle:

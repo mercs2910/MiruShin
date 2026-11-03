@@ -2,6 +2,11 @@ name: Build Android APK
 
 on:
   workflow_dispatch:
+    inputs:
+      diagnostic:
+        description: Separate test app with external playback checks
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -34,6 +39,7 @@ jobs:
         run: flutter pub get
 
       - name: Generate .env (TMDB key)
+        if: ${{ !inputs.diagnostic }}
         uses: ./.github/actions/generate-env
         with:
           tmdb-read-access-token: ${{ secrets.TMDB_READ_ACCESS_TOKEN }}
@@ -41,9 +47,25 @@ jobs:
           fanart-tv-api-key: ${{ secrets.FANART_TV_API_KEY }}
 
       - name: Set up Android release signing
+        if: ${{ !inputs.diagnostic }}
         uses: ./.github/actions/android-signing
         with:
           keystore-base64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+
+      - name: Prepare diagnostic build without account secrets
+        if: ${{ inputs.diagnostic }}
+        run: |
+          printf 'TMDB_READ_ACCESS_TOKEN=\nMODULE_LIBRARY_URL=\nFANART_TV_API_KEY=\n' > .env
+          echo 'mirushinDiagnostic=true' >> android/gradle.properties
+          dart run build_runner build --delete-conflicting-outputs
+          dart format lib/features/player/application/external_playback.dart lib/features/player/engine/external_player_engine.dart lib/features/player/engine/player_engine.dart lib/features/player/engine/media_kit_player_engine.dart lib/features/player/application/playback_controller.dart lib/features/settings/presentation/settings_page.dart lib/app/app.dart test/external_playback_test.dart
+          git diff -- lib test > formatting.patch
+
+      - name: Analyze and test diagnostic playback
+        if: ${{ inputs.diagnostic }}
+        run: |
+          flutter analyze --no-fatal-infos --no-fatal-warnings
+          flutter test test/external_playback_test.dart test/playback_attempt_plan_test.dart test/auto_skip_test.dart test/player_settings_test.dart
 
       - name: Prepare Android version
         id: ver
@@ -87,3 +109,10 @@ jobs:
         with:
           name: MiruShin-android
           path: ${{ steps.apk.outputs.apk_path }}
+
+      - name: Upload diagnostic formatting
+        if: ${{ always() && inputs.diagnostic }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: diagnostic-formatting
+          path: formatting.patch

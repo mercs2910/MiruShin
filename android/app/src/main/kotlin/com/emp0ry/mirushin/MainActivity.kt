@@ -91,6 +91,9 @@ class MainActivity : FlutterActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "mirushin/external_playback")
+            .setMethodCallHandler { call, result -> ExternalPlayback.handle(this, call, result) }
+
         // Media session channel
         val mch = MethodChannel(
             flutterEngine.dartExecutor.binaryMessenger, "mirushin/media_session"
@@ -428,6 +431,12 @@ class MainActivity : FlutterActivity() {
         session = null
         noisyReceiver?.let { try { unregisterReceiver(it) } catch (_: Exception) {} }
         noisyReceiver = null
+    }
+
+    @Deprecated("Activity result bridge for external player APIs")
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == ExternalPlayback.REQUEST) ExternalPlayback.onResult(this, resultCode, data)
     }
 
     override fun onDestroy() {

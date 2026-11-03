@@ -17,9 +17,11 @@ class PlayerSource {
     this.streamType = StreamType.unknown,
     this.disableProxy = false,
     this.allowDirectFallback = true,
+    this.softwareDecoding = false,
   });
 
   final String url;
+  final bool softwareDecoding;
   final Map<String, String> headers;
   final StreamType streamType;
 

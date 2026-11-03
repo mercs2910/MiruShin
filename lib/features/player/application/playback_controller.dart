@@ -30,6 +30,7 @@ import '../domain/player_models.dart';
 import '../domain/player_volume_policy.dart';
 import '../domain/seek_settle.dart';
 import '../engine/local_hls_proxy.dart';
+import '../engine/external_player_engine.dart';
 import '../engine/player_engine.dart';
 import '../engine/player_engine_factory.dart';
 import '../engine/seek_thumbnail.dart';
@@ -37,6 +38,7 @@ import '../engine/seek_thumbnail_extractor.dart';
 import '../engine/seek_thumbnail_source.dart';
 import '../engine/stream_url_policy.dart';
 import 'playback_activity.dart';
+import 'external_playback.dart';
 import 'player_settings.dart';
 import 'resume_stability.dart';
 
@@ -716,6 +718,10 @@ class PlaybackController extends Notifier<PlaybackState> {
   void _updateMediaSession() {
     final MediaPlaybackItem? item = state.item;
     final PlayerEngine? engine = state.engine;
+    if (engine is ExternalPlayerEngine) {
+      unawaited(MediaSessionService.clearNowPlaying());
+      return;
+    }
     if (item == null || engine == null || !engine.state.value.isInitialized) {
       unawaited(MediaSessionService.clearNowPlaying());
       unawaited(
@@ -1225,12 +1231,22 @@ class PlaybackController extends Notifier<PlaybackState> {
     );
     if (generation != _playbackGeneration) return;
     final bool youtubeEmbed = _isYoutubeTrailerServer(server);
+    final ExternalPlayer external = youtubeEmbed || !supportsExternalPlayback
+        ? ExternalPlayer.internal
+        : await ref.read(externalPlayerProvider.future);
+    if (generation != _playbackGeneration) return;
+    final bool softwareDecoding = external == ExternalPlayer.internalSoftware;
+    final bool externalPlayback = external != ExternalPlayer.internal && !softwareDecoding;
     final List<PlaybackAttempt> attempts = youtubeEmbed
         ? const <PlaybackAttempt>[]
+        : externalPlayback
+        ? const <PlaybackAttempt>[
+            PlaybackAttempt(backend: PlayerBackend.auto, route: PlaybackRoute.direct),
+          ]
         : attemptPlan ??
               prioritizePlaybackAttempt(
                 _buildPlaybackAttemptPlan(
-                  preference: backendOverride ?? settings.playerBackend,
+                  preference: softwareDecoding ? PlayerBackend.mpv : backendOverride ?? settings.playerBackend,
                   url: url,
                   streamType: streamType,
                 ),
@@ -1264,7 +1280,7 @@ class PlaybackController extends Notifier<PlaybackState> {
     final PlayerBackend thumbnailBackend = seekThumbnailExtractionBackend(
       engineBackend,
     );
-    if (settings.seekPreviewsEnabled) {
+    if (settings.seekPreviewsEnabled && !externalPlayback) {
       await _seekThumbnailService.activate(thumbnailPlan, thumbnailBackend);
     }
     if (generation != _playbackGeneration) return;
@@ -1286,7 +1302,24 @@ class PlaybackController extends Notifier<PlaybackState> {
         ? await _localizedText('Back')
         : 'Back';
     if (generation != _playbackGeneration) return;
-    final PlayerEngine engine = ref.read(playerEngineBuilderProvider)(
+    final PlayerEngine engine = externalPlayback
+        ? ExternalPlayerEngine(
+            target: external,
+            title: '${item.title} · ${item.subtitle}',
+            context: {
+              'workspaceId': ref.read(libraryWorkspaceScopeProvider).workspaceId,
+              'media': _trackingMediaItem(item).toJson(),
+              'season': item.seasonNumber,
+              'episode': item.episodeNumber,
+              'ignoreProgress': item.ignoreProgress,
+            },
+            prepare: () => recoverExternalPlayback(ref),
+            onReturn: (engine) async {
+              await _saveProgress(item, engine);
+              await recoverExternalPlayback(ref, returned: true);
+            },
+          )
+        : ref.read(playerEngineBuilderProvider)(
       initialAspectRatio: _safeAspectRatio(preserveAspectRatio),
       backend: engineBackend,
       youtubeEmbed: youtubeEmbed,
@@ -1318,6 +1351,7 @@ class PlaybackController extends Notifier<PlaybackState> {
               streamType: streamType,
               disableProxy: disableProxy,
               allowDirectFallback: youtubeEmbed,
+              softwareDecoding: softwareDecoding,
             ),
             startAt: position,
             autoplay: false,
@@ -1367,7 +1401,7 @@ class PlaybackController extends Notifier<PlaybackState> {
       _retryCount = 0;
       _updateMediaSession();
       _startProgressSaver();
-      _watchPlaybackProgress(engine, generation, attempt, position);
+      _watchPlaybackProgress(engine, generation, externalPlayback ? null : attempt, position);
       if (!engine.managesStartupPlaybackSpeed) {
         _reinforcePlaybackSpeed(engine, generation);
       }
@@ -1470,6 +1504,7 @@ class PlaybackController extends Notifier<PlaybackState> {
   }
 
   bool _seekPreviewsEnabled({PlayerSettings? settings}) {
+    if (state.engine is ExternalPlayerEngine) return false;
     return (settings ??
             ref.read(playerSettingsProvider).value ??
             const PlayerSettings())
@@ -3864,6 +3899,25 @@ class PlaybackController extends Notifier<PlaybackState> {
 
   PlaybackEndEvaluation _playbackEndEvaluation(PlayerEngine engine) {
     final PlayerEngineState es = engine.state.value;
+    if (engine is ExternalPlayerEngine && engine.explicitCompletion) {
+      return PlaybackEndEvaluation(
+        decision: PlaybackEndDecision.confirmedEnded,
+        observedPosition: es.position,
+        authoritativeDuration: es.duration > Duration.zero ? es.duration : null,
+        watchedThresholdReached: true,
+      );
+    }
+    if (engine is ExternalPlayerEngine) {
+      // MediaSession positions are clock estimates. Only the external app's
+      // documented completion callback may reset progress or advance episodes.
+      return PlaybackEndEvaluation(
+        decision: PlaybackEndDecision.notEnded,
+        observedPosition: es.position,
+        authoritativeDuration: es.duration >= const Duration(seconds: 30) ? es.duration : null,
+        watchedThresholdReached: es.duration >= const Duration(minutes: 2) &&
+            es.position.inMilliseconds >= es.duration.inMilliseconds * _watchedFraction,
+      );
+    }
     final MediaServer? server = state.server;
     final PlaybackMediaKind mediaKind = _mediaKindForCurrentSource();
     final bool isOffline = server != null && _isOfflineLocalServer(server);
@@ -4280,6 +4334,7 @@ class PlaybackController extends Notifier<PlaybackState> {
       if (item.ignoreProgress || !ref.mounted) return;
 
       final PlayerEngineState engineState = engine.state.value;
+      if (engine is ExternalPlayerEngine && !engineState.isInitialized) return;
       _trackMaxObservedPosition(engine);
       final bool hasPendingSeekTarget =
           (_queuedSeekEngine == engine && _queuedSeekTarget != null) ||

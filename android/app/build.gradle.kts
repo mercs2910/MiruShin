@@ -35,7 +35,9 @@ android {
     }
 
     defaultConfig {
-        applicationId = "com.emp0ry.mirushin"
+        val diagnostic = providers.gradleProperty("mirushinDiagnostic").orNull == "true"
+        applicationId = if (diagnostic) "com.emp0ry.mirushin.diagnostic" else "com.emp0ry.mirushin"
+        manifestPlaceholders["mirushinLabel"] = if (diagnostic) "MiruShin Test" else "MiruShin"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
@@ -69,6 +71,7 @@ android {
 
     buildTypes {
         release {
+            isDebuggable = providers.gradleProperty("mirushinDiagnostic").orNull == "true"
             // Use the stable release key when key.properties is present;
             // otherwise fall back to debug so `flutter run --release` still works
             // (debug-signed builds can't be updated over each other, though).
