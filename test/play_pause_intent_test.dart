@@ -155,8 +155,11 @@ void main() {
               )
               .get();
           expect(
-            deliveries.every((delivery) => delivery.target == 'drive'),
-            isTrue,
+            deliveries.map((delivery) => delivery.target).toSet(),
+            {'drive', 'drive.playback'},
+            reason:
+                'Checkpoints use the library and compact playback Drive queues; '
+                'Auto Progress off must not enqueue tracker deliveries.',
           );
         },
       );
