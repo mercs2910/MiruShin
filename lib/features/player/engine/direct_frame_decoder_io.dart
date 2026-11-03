@@ -70,8 +70,16 @@ class NativeDirectFrameDecoder implements DirectFrameDecoder {
           'responses': responses.sendPort,
         },
         debugName: 'MiruShinSeekThumbnailDecoder',
+        // A worker that dies before sending its port must not hang every
+        // decode, dispose and the player open that waits on them.
+        onExit: ready.sendPort,
       );
-      _worker = await ready.first as SendPort;
+      final Object? port = await ready.first;
+      if (port is! SendPort) {
+        _supported = false;
+        return;
+      }
+      _worker = port;
     } finally {
       ready.close();
     }

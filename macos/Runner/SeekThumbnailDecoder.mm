@@ -287,3 +287,8 @@ MIRUSHIN_EXPORT void mirushin_seek_thumbnail_session_destroy(void* value) {
   }
   delete session;
 }
+
+// Lives next to the malloc above: a Swift @_cdecl copy is stripped from Release.
+MIRUSHIN_EXPORT void mirushin_seek_thumbnail_free(uint8_t* data) {
+  std::free(data);
+}

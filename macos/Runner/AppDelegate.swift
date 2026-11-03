@@ -140,11 +140,6 @@ func mirushinSeekThumbnailDecode(
   }
 }
 
-@_cdecl("mirushin_seek_thumbnail_free")
-func mirushinSeekThumbnailFree(_ data: UnsafeMutablePointer<UInt8>?) {
-  free(data)
-}
-
 private func mirushinWriteThumbnailError(
   _ message: String,
   _ output: UnsafeMutablePointer<CChar>?,
