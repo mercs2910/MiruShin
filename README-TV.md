@@ -15,6 +15,8 @@ https://github.com/mercs2910/MiruShin/tree/fix/android-external-players.
   через оперативну пам'ять. Це перевірка обходу проблемного шляху передачі
   кадрів, а не доведене виправлення драйвера. Діагностика показує фактичний
   `hwdec-current`, щоб відрізнити апаратний режим від програмного fallback.
+  На RockTek RTD1325 цей експеримент теж повторив зависання приблизно
+  через три хвилини, тому виправленням для цієї приставки він не є.
 - Цей вибір зберігається окремо від синхронізованих налаштувань і не змінює
   плеєр на Mac.
 - Зовнішньому плеєру передаються обрана серія та початкова позиція.
@@ -44,6 +46,13 @@ Android. Самого результату виходу з плеєра недо
 відсутність відповіді плеєра. Для автоматичного переходу на наступну серію
 зовнішній плеєр має підтвердити завершення.
 
+На перевіреній приставці Vimu й Next надають позицію та перемотування,
+а MX 3.3.1 повертає лише позицію при звичайному виході. Тому періодичне
+збереження та автопропуски для цієї версії MX не підтверджені. У Next
+пропуски й відновлення після закриття процесу працювали, але автоперехід
+після кінця тестового потоку не спрацював. Точні умови й виміри наведені
+в `docs/device-test-results.md`.
+
 Тестова збірка має пакет `com.emp0ry.mirushin.diagnostic`, назву
 **MiruShin Test** і встановлюється поруч із початковим застосунком.
 Вона використовує випусковий режим Flutter й окремий ключ нашого проєкту.
@@ -65,7 +74,7 @@ Android. Самого результату виходу з плеєра недо
 flutter pub get
 dart run build_runner build --delete-conflicting-outputs
 flutter analyze --no-fatal-infos --no-fatal-warnings
-flutter test test/external_playback_test.dart test/playback_attempt_plan_test.dart test/auto_skip_test.dart test/player_settings_test.dart test/player_checkpoint_persistence_test.dart
+flutter test test/external_playback_test.dart test/playback_attempt_plan_test.dart test/auto_skip_test.dart test/player_settings_test.dart test/player_checkpoint_persistence_test.dart test/player_transport_smoothness_test.dart test/player_engine_capability_test.dart test/player_models_test.dart test/player_video_surface_test.dart test/player_fullscreen_transition_test.dart
 flutter build apk --release --target-platform android-arm
 ```
 
@@ -86,3 +95,7 @@ flutter build apk --release --target-platform android-arm
 `docs/device-test-results.md`. Дослідження відкритих плеєрів:
 `docs/android-player-research.md`. Пріоритет користувача — працездатне
 апаратне декодування; програмний режим залишається запасним.
+
+Виправлення циклу метаданих Google Drive і відправлення прогресу при
+виході перенесено з macOS-worktree. Перевірки та спосіб вимірювання
+операцій на ТВ описані в `docs/google-drive-sync-transfer.md`.

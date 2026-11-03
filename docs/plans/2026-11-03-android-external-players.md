@@ -60,6 +60,7 @@ Primary API references:
 
 ## Build
 
-This Mac has no Flutter SDK, Android SDK, or Java runtime installed. Prepare
-the minimal patch locally and use an isolated fork/branch and manual GitHub
+Flutter was later found at `/Users/echo/development/flutter/bin/flutter`;
+the local playback regression suite passes with it. An Android SDK and Java
+runtime have not been found in the checked locations. Use an isolated fork/branch and manual GitHub
 Actions job to run Flutter checks and build the diagnostic APK.
