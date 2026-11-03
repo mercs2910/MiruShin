@@ -28,6 +28,8 @@ class ExternalPlayerEngine extends PlayerEngine {
   bool _returned = false;
   bool explicitCompletion = false;
   bool _canControl = false;
+  bool _canSeek = false;
+  double? _startupSpeed;
 
   @override
   ValueListenable<PlayerEngineState> get state => _state;
@@ -42,7 +44,7 @@ class ExternalPlayerEngine extends PlayerEngine {
 
   @override
   Widget buildVideoSurface(BuildContext context) => Center(
-    child: Text('Відтворення у ${target.label}. Поверніться кнопкою «Назад».'),
+    child: Text('Воспроизведение в ${target.label}. Вернитесь кнопкой «Назад».'),
   );
 
   @override
@@ -72,6 +74,7 @@ class ExternalPlayerEngine extends PlayerEngine {
       if (value == null || _disposed) return;
       explicitCompletion = value['completed'] == true;
       _canControl = value['observed'] == true && value['active'] == true;
+      _canSeek = value['canSeek'] == true;
       _returned = value['returned'] == true;
       _state.value = _state.value.copyWith(
         position: Duration(milliseconds: (value['positionMs'] as num).toInt()),
@@ -83,12 +86,17 @@ class ExternalPlayerEngine extends PlayerEngine {
         isCompleted: explicitCompletion,
         playbackSpeed: (value['speed'] as num?)?.toDouble(),
       );
+      if (_canControl && _startupSpeed != null) {
+        final speed = _startupSpeed!;
+        _startupSpeed = null;
+        await _command('speed', {'speed': speed});
+      }
       if (_returned) {
         _timer?.cancel();
         await onReturn(this);
         if (!_disposed && value['error'] == true) {
           _state.value = _state.value.copyWith(hasError: true,
-            errorDescription: '${target.label} не зміг відтворити відео. Спробуйте інший режим плеєра.');
+            errorDescription: '${target.label} не смог воспроизвести видео. Попробуйте другой режим плеера.');
           return;
         }
         if (!_disposed && !explicitCompletion) _commands.add(PlayerEngineUiCommand.exitPlayer);
@@ -96,13 +104,13 @@ class ExternalPlayerEngine extends PlayerEngine {
     } on Object catch (error) {
       if (!_disposed) {
         _state.value = _state.value.copyWith(hasError: true,
-          errorDescription: 'Не вдалося отримати або зберегти стан зовнішнього плеєра (${error.runtimeType}).');
+          errorDescription: 'Не удалось получить или сохранить состояние внешнего плеера (${error.runtimeType}).');
       }
     } finally { _polling = false; }
   }
 
   Future<void> _command(String command, [Map<String, Object?> args = const {}]) async {
-    if (!_canControl || _disposed) return;
+    if (!_canControl || _disposed || (command == 'seek' && !_canSeek)) return;
     await ExternalPlaybackBridge.channel.invokeMethod('command', {
       'sessionId': _sessionId, 'command': command, ...args,
     });
@@ -114,7 +122,10 @@ class ExternalPlayerEngine extends PlayerEngine {
   @override
   Future<void> seekTo(Duration position) => _command('seek', {'positionMs': position.inMilliseconds});
   @override
-  Future<void> setPlaybackSpeed(double speed) => _command('speed', {'speed': speed});
+  Future<void> setPlaybackSpeed(double speed) async {
+    if (!_canControl) { _startupSpeed = speed; return; }
+    await _command('speed', {'speed': speed});
+  }
   @override
   Future<void> setVolume(double volume) async {} // External player uses system volume.
   @override

@@ -14,10 +14,10 @@ import 'player_settings.dart';
 
 enum ExternalPlayer {
   internal('MiruShin'),
-  internalSoftware('MiruShin · програмне декодування'),
+  internalSoftware('MiruShin · программное декодирование'),
   vimu('Vimu'),
   mx('MX Player'),
-  mxSoftware('MX Player · програмне декодування');
+  mxSoftware('MX Player · программное декодирование');
 
   const ExternalPlayer(this.label);
   final String label;
@@ -46,7 +46,7 @@ class ExternalPlayerPreference extends AsyncNotifier<ExternalPlayer> {
   Future<void> select(ExternalPlayer value) async {
     final prefs = await SharedPreferences.getInstance();
     if (!await prefs.setString(key, value.name)) {
-      throw StateError('Не вдалося зберегти вибір плеєра');
+      throw StateError('Не удалось сохранить выбор плеера');
     }
     state = AsyncData(value);
   }
@@ -133,7 +133,7 @@ Future<void> _recover(Ref ref) async {
         completed: watched, mediaItem: media, occurredAt: updatedAt,
       );
       if (!ref.mounted || ref.read(libraryWorkspaceScopeProvider).workspaceId != workspace) {
-        throw StateError('Під час відновлення змінився обліковий запис');
+        throw StateError('Во время восстановления изменилась учётная запись');
       }
       await library.saveEpisodeProgress(
         mediaId: media.id, season: season, episode: episode,
@@ -157,8 +157,13 @@ Future<void> _recover(Ref ref) async {
         }
       }
     },
-    acknowledge: () => ExternalPlaybackBridge.channel.invokeMethod('ack', {
-      'sessionId': checkpoint['sessionId'], 'revision': checkpoint['revision'],
-    }),
+    acknowledge: () async {
+      if (!ref.mounted || ref.read(libraryWorkspaceScopeProvider).workspaceId != workspace) {
+        throw StateError('Во время восстановления изменилась учётная запись');
+      }
+      await ExternalPlaybackBridge.channel.invokeMethod('ack', {
+        'sessionId': checkpoint['sessionId'], 'revision': checkpoint['revision'],
+      });
+    },
   );
 }

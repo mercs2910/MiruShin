@@ -2289,7 +2289,12 @@ class _AutoSkipWorkerState extends ConsumerState<_AutoSkipWorker> {
     final Duration duration = controller.value.duration;
     if (duration <= Duration.zero) return;
 
-    final SkipMarkers markers = widget.markers;
+    // The external app pauses Flutter's frames. Read completed marker requests
+    // directly instead of waiting for a background widget rebuild.
+    final SkipMarkers markers = _effectiveSkipMarkers(
+      ref.read(skipMarkersProvider).value,
+      widget.markers,
+    );
     final PlayerSettings settings = widget.settings;
     if (_maybeSkip(
       kind: 'op',

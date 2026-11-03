@@ -38,6 +38,13 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
+      - name: Cache diagnostic signing identity
+        if: ${{ inputs.diagnostic }}
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: mirushin-diagnostic-signing-v1
+
       - name: Generate .env (TMDB key)
         if: ${{ !inputs.diagnostic }}
         uses: ./.github/actions/generate-env
@@ -58,7 +65,7 @@ jobs:
           printf 'TMDB_READ_ACCESS_TOKEN=\nMODULE_LIBRARY_URL=\nFANART_TV_API_KEY=\n' > .env
           echo 'mirushinDiagnostic=true' >> android/gradle.properties
           dart run build_runner build --delete-conflicting-outputs
-          dart format lib/features/player/application/external_playback.dart lib/features/player/engine/external_player_engine.dart lib/features/player/engine/player_engine.dart lib/features/player/engine/media_kit_player_engine.dart lib/features/player/application/playback_controller.dart lib/features/settings/presentation/settings_page.dart lib/app/app.dart test/external_playback_test.dart
+          dart format lib/features/player/application/external_playback.dart lib/features/player/engine/external_player_engine.dart lib/features/player/engine/player_engine.dart lib/features/player/engine/media_kit_player_engine.dart lib/features/player/application/playback_controller.dart lib/features/player/presentation/player_page.dart lib/features/settings/presentation/settings_page.dart lib/app/app.dart test/external_playback_test.dart
           git diff -- lib test > formatting.patch
 
       - name: Analyze and test diagnostic playback

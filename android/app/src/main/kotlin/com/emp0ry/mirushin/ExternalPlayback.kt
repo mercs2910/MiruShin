@@ -67,7 +67,7 @@ object ExternalPlayback {
                     // A late database save must not erase a newer native checkpoint.
                     if (saved != null && saved.optString("sessionId") == id && saved.optLong("revision") == revision &&
                         current?.optBoolean("active") != true) {
-                        check(prefs(activity).edit().remove(KEY).commit()) { "Не вдалося підтвердити збереження позиції" }
+                        check(prefs(activity).edit().remove(KEY).commit()) { "Не удалось подтвердить сохранение позиции" }
                     }
                     result.success(null)
                 }
@@ -77,12 +77,12 @@ object ExternalPlayback {
                     result.success(current?.takeIf { it.optString("sessionId") == call.argument<String>("sessionId") }?.let(::toMap))
                 }
                 "command" -> {
-                    check(current?.optString("sessionId") == call.argument<String>("sessionId")) { "Сеанс відтворення вже змінився" }
-                    val c = controller ?: error("Плеєр не надав доступу до керування відтворенням")
+                    check(current?.optString("sessionId") == call.argument<String>("sessionId")) { "Сеанс воспроизведения уже изменился" }
+                    val c = controller ?: error("Плеер не предоставил доступ к управлению воспроизведением")
                     val actions = c.playbackState?.actions ?: 0L
                     when (call.argument<String>("command")) {
                         "seek" -> {
-                            require(actions and PlaybackState.ACTION_SEEK_TO != 0L) { "Цей плеєр не дозволяє зовнішнє перемотування" }
+                            require(actions and PlaybackState.ACTION_SEEK_TO != 0L) { "Этот плеер не поддерживает внешнюю перемотку" }
                             c.transportControls.seekTo(call.argument<Number>("positionMs")!!.toLong())
                         }
                         "play" -> c.transportControls.play()
@@ -104,21 +104,21 @@ object ExternalPlayback {
             }
         } catch (e: Exception) {
             // Never include Intent/URL arguments in errors or logs.
-            result.error("external_player", e.message ?: "Помилка зовнішнього плеєра", null)
+            result.error("external_player", e.message ?: "Ошибка внешнего плеера", null)
         }
     }
 
     private fun start(activity: Activity, call: MethodCall, result: MethodChannel.Result) {
-        check(allowed(activity)) { "Спочатку дозвольте MiruShin доступ у налаштуваннях Android → Доступ до сповіщень" }
-        check(prefs(activity).getString(KEY, null) == null) { "Спочатку збережіть прогрес попереднього відтворення у відповідному обліковому записі" }
+        check(allowed(activity)) { "Сначала разрешите доступ для MiruShin в настройках Android → Доступ к уведомлениям" }
+        check(prefs(activity).getString(KEY, null) == null) { "Сначала сохраните прогресс предыдущего воспроизведения в соответствующей учётной записи" }
         val target = call.argument<String>("target")!!
         val pkg = when (target) {
             "vimu" -> "net.gtvbox.videoplayer"
             "mx", "mxSoftware" -> "com.mxtech.videoplayer.ad"
-            else -> error("Цей плеєр не підтримується")
+            else -> error("Этот плеер не поддерживается")
         }
         val uri = Uri.parse(call.argument<String>("url")!!)
-        require(uri.scheme in listOf("http", "https")) { "Зовнішній плеєр наразі підтримує лише мережеві джерела" }
+        require(uri.scheme in listOf("http", "https")) { "Внешний плеер пока поддерживает только сетевые источники" }
         val position = call.argument<Number>("positionMs")!!.toLong().coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
         val title = call.argument<String>("title") ?: "MiruShin"
         val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, call.argument<String>("mime") ?: "video/*")
@@ -139,7 +139,7 @@ object ExternalPlayback {
             val headers = call.argument<Map<String, String>>("headers") ?: emptyMap()
             intent.putExtra("headers", headers.flatMap { listOf(it.key, it.value) }.toTypedArray())
         }
-        check(intent.resolveActivity(activity.packageManager) != null) { "Спочатку встановіть вибраний зовнішній плеєр" }
+        check(intent.resolveActivity(activity.packageManager) != null) { "Сначала установите выбранный внешний плеер" }
         val requestCode = REQUEST + ((prefs(activity).getInt("requestSequence", 0) + 1) % 4096)
         check(prefs(activity).edit().putInt("requestSequence", requestCode - REQUEST).commit())
         current = JSONObject().apply {
@@ -235,7 +235,7 @@ object ExternalPlayback {
         val s = current ?: return
         s.put("revision", s.optLong("revision") + 1)
         s.put("updatedAtMs", System.currentTimeMillis())
-        check(prefs(context).edit().putString(KEY, s.toString()).commit()) { "Не вдалося зберегти позицію відтворення" }
+        check(prefs(context).edit().putString(KEY, s.toString()).commit()) { "Не удалось сохранить позицию воспроизведения" }
         lastCommit = SystemClock.elapsedRealtime()
     }
 
