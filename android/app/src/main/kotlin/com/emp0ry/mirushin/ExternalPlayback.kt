@@ -15,6 +15,7 @@ import android.os.Looper
 import android.os.SystemClock
 import android.provider.Settings
 import android.service.notification.NotificationListenerService
+import android.util.Log
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONObject
@@ -237,6 +238,9 @@ object ExternalPlayback {
         s.put("revision", s.optLong("revision") + 1)
         s.put("updatedAtMs", System.currentTimeMillis())
         check(prefs(context).edit().putString(KEY, s.toString()).commit()) { "Не удалось сохранить позицию воспроизведения" }
+        if (s.getJSONObject("context").optBoolean("diagnostics")) {
+            Log.i("MiruExternal", "saved positionMs=${s.optLong("positionMs")} durationMs=${s.optLong("durationMs")} revision=${s.optLong("revision")} observed=${s.optBoolean("observed")} completed=${s.optBoolean("completed")}")
+        }
         lastCommit = SystemClock.elapsedRealtime()
     }
 

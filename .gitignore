@@ -100,6 +100,8 @@ android/.gradle/
 
 android/local.properties
 android/key.properties
+android/.signing/
+artifacts/
 **/android/key.properties
 
 # Keystores & props

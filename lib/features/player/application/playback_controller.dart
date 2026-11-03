@@ -1312,6 +1312,7 @@ class PlaybackController extends Notifier<PlaybackState> {
               'season': item.seasonNumber,
               'episode': item.episodeNumber,
               'ignoreProgress': item.ignoreProgress,
+              'diagnostics': settings.diagnosticsEnabled,
             },
             prepare: () => recoverExternalPlayback(ref),
             onReturn: (engine) async {

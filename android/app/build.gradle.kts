@@ -71,7 +71,6 @@ android {
 
     buildTypes {
         release {
-            isDebuggable = providers.gradleProperty("mirushinDiagnostic").orNull == "true"
             // Use the stable release key when key.properties is present;
             // otherwise fall back to debug so `flutter run --release` still works
             // (debug-signed builds can't be updated over each other, though).

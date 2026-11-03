@@ -38,13 +38,6 @@ jobs:
       - name: Flutter pub get
         run: flutter pub get
 
-      - name: Cache diagnostic signing identity
-        if: ${{ inputs.diagnostic }}
-        uses: actions/cache@v4
-        with:
-          path: ~/.android/debug.keystore
-          key: mirushin-diagnostic-signing-v1
-
       - name: Generate .env (TMDB key)
         if: ${{ !inputs.diagnostic }}
         uses: ./.github/actions/generate-env
@@ -67,6 +60,22 @@ jobs:
           dart run build_runner build --delete-conflicting-outputs
           dart format lib/features/player/application/external_playback.dart lib/features/player/engine/external_player_engine.dart lib/features/player/engine/player_engine.dart lib/features/player/engine/media_kit_player_engine.dart lib/features/player/application/playback_controller.dart lib/features/player/presentation/player_page.dart lib/features/settings/presentation/settings_page.dart lib/app/app.dart test/external_playback_test.dart
           git diff -- lib test > formatting.patch
+
+      - name: Sign diagnostic app with its separate development key
+        if: ${{ inputs.diagnostic }}
+        env:
+          DIAGNOSTIC_SIGNING: ${{ secrets.MIRUSHIN_TV_SIGNING }}
+        run: |
+          python3 - <<'PY'
+          import os, json, base64
+          from pathlib import Path
+          signing = json.loads(os.environ['DIAGNOSTIC_SIGNING'])
+          Path('android/app/mirushin-tv.p12').write_bytes(base64.b64decode(signing['keystore']))
+          Path('android/key.properties').write_text(
+              'storeFile=mirushin-tv.p12\nkeyAlias=mirushin-tv\n'
+              + 'storePassword=' + signing['password'] + '\n'
+              + 'keyPassword=' + signing['password'] + '\n')
+          PY
 
       - name: Analyze and test diagnostic playback
         if: ${{ inputs.diagnostic }}
@@ -127,3 +136,12 @@ jobs:
         with:
           name: diagnostic-formatting
           path: formatting.patch
+
+      - name: Upload Android build diagnostics
+        if: ${{ failure() && inputs.diagnostic }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: android-build-diagnostics
+          path: |
+            build/app/outputs/**/*.apk
+            build/app/outputs/logs/**
