@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 
+import 'package:collection/collection.dart' show DeepCollectionEquality;
 import 'package:crypto/crypto.dart';
 import 'package:drift/drift.dart';
 import 'package:flutter/foundation.dart';
@@ -1302,7 +1303,11 @@ class CanonicalLibraryRepository {
             canonicalStateJson: Value<String>(jsonEncode(after.toJson())),
           ),
         );
-    if (replicate) {
+    if (replicate &&
+        !const DeepCollectionEquality().equals(
+          _replicatedMediaJson(before.mediaItem),
+          _replicatedMediaJson(merged),
+        )) {
       await _appendOperationLocked(
         LibraryOperationDraft(
           localId: localId,
@@ -8850,6 +8855,24 @@ bool _revisionDescendsFrom(
     );
   }
   return false;
+}
+
+// Every device refetches these itself. Replicating them made devices with
+// different title languages overwrite each other's metadata in a Drive loop.
+const Set<String> _deviceLocalMediaExternalIds = <String>{
+  'anilist_popularity',
+  'anilist_favourites',
+  'anilist_tags',
+};
+
+Map<String, dynamic> _replicatedMediaJson(MediaItem media) {
+  final Map<String, dynamic> json = _jsonMap(
+    jsonDecode(jsonEncode(media.toJson())),
+  )..remove('title');
+  json['externalIds'] = <String, dynamic>{
+    ..._jsonMap(json['externalIds']),
+  }..removeWhere((String key, _) => _deviceLocalMediaExternalIds.contains(key));
+  return json;
 }
 
 Object? _canonicalFieldValue(

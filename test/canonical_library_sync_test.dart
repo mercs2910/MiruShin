@@ -744,6 +744,41 @@ void main() {
     });
 
     test(
+      'title language and live counters stay local instead of looping Drive',
+      () async {
+        final UserMediaState initial = _state(progress: 6);
+        await repository.saveTrackingStates(<UserMediaState>[initial]);
+        Future<void> enrich(MediaItem media) =>
+            repository.enrichPresentationMetadata(
+              identity: initial.identity,
+              mediaItem: media,
+            );
+        final MediaItem english = initial.mediaItem.copyWith(
+          title: 'ERASED',
+          externalIds: <String, String>{
+            ...initial.mediaItem.externalIds,
+            'anilist_popularity': '504228',
+            'anilist_favourites': '22850',
+            'anilist_tags': 'Curses:96:0:0:Theme',
+          },
+        );
+
+        await enrich(english);
+        await enrich(initial.mediaItem);
+        await enrich(english);
+
+        expect(
+          (await repository.loadTrackingStates()).single.mediaItem.title,
+          'ERASED',
+        );
+        expect(await repository.watchPendingDriveDeliveryCount().first, 0);
+
+        await enrich(english.copyWith(overview: 'Offline synopsis'));
+        expect(await repository.watchPendingDriveDeliveryCount().first, 1);
+      },
+    );
+
+    test(
       'Drive checkpoint fills missing entries without whole-record overwrites',
       () async {
         final UserMediaState remoteShared = _state(progress: 7, score: 7);
