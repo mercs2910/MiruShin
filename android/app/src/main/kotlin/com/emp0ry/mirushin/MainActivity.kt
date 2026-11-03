@@ -436,7 +436,7 @@ class MainActivity : FlutterActivity() {
     @Deprecated("Activity result bridge for external player APIs")
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == ExternalPlayback.REQUEST) ExternalPlayback.onResult(this, resultCode, data)
+        ExternalPlayback.onResult(this, requestCode, resultCode, data)
     }
 
     override fun onDestroy() {

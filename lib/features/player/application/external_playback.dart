@@ -17,7 +17,7 @@ enum ExternalPlayer {
   internalSoftware('MiruShin · програмне декодування'),
   vimu('Vimu'),
   mx('MX Player'),
-  mxSoftware('MX Player · S/W');
+  mxSoftware('MX Player · програмне декодування');
 
   const ExternalPlayer(this.label);
   final String label;
@@ -46,7 +46,7 @@ class ExternalPlayerPreference extends AsyncNotifier<ExternalPlayer> {
   Future<void> select(ExternalPlayer value) async {
     final prefs = await SharedPreferences.getInstance();
     if (!await prefs.setString(key, value.name)) {
-      throw StateError('Could not save external player preference');
+      throw StateError('Не вдалося зберегти вибір плеєра');
     }
     state = AsyncData(value);
   }
@@ -133,7 +133,7 @@ Future<void> _recover(Ref ref) async {
         completed: watched, mediaItem: media, occurredAt: updatedAt,
       );
       if (!ref.mounted || ref.read(libraryWorkspaceScopeProvider).workspaceId != workspace) {
-        throw StateError('Playback account changed during recovery');
+        throw StateError('Під час відновлення змінився обліковий запис');
       }
       await library.saveEpisodeProgress(
         mediaId: media.id, season: season, episode: episode,

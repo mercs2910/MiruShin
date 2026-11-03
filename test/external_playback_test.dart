@@ -1,7 +1,16 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:mirushin/features/player/application/external_playback.dart';
+import 'package:mirushin/features/player/engine/external_player_engine.dart';
+import 'package:mirushin/features/player/engine/player_engine.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
+  TestWidgetsFlutterBinding.ensureInitialized();
   Map<String, dynamic> checkpoint({bool observed = true, bool ignore = false}) => {
     'context': {'workspaceId': 'anilist:1', 'ignoreProgress': ignore},
     'observed': observed,
@@ -40,4 +49,72 @@ void main() {
       expect(acknowledged, isTrue);
     });
   }
+
+  test('TV player choice leaves synchronized desktop settings unchanged', () async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    addTearDown(() => debugDefaultTargetPlatformOverride = null);
+    SharedPreferences.setMockInitialValues({'mirushin.player.settings': '{"playerBackend":"auto"}'});
+    final container = ProviderContainer();
+    addTearDown(container.dispose);
+    await container.read(externalPlayerProvider.future);
+    await container.read(externalPlayerProvider.notifier).select(ExternalPlayer.vimu);
+    final prefs = await SharedPreferences.getInstance();
+    expect(prefs.getString('mirushin.player.settings'), '{"playerBackend":"auto"}');
+    expect(container.read(externalPlayerProvider).value, ExternalPlayer.vimu);
+  });
+
+  testWidgets('normal return saves confirmed position before leaving MiruShin', (tester) async {
+    var snapshot = <String, dynamic>{
+      'observed': false, 'active': true, 'returned': false, 'completed': false,
+      'positionMs': 250000, 'durationMs': 0,
+    };
+    final calls = <MethodCall>[];
+    final persisted = Completer<void>();
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(ExternalPlaybackBridge.channel, (call) async {
+          calls.add(call);
+          return call.method == 'state' ? snapshot : null;
+        });
+    addTearDown(() => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(ExternalPlaybackBridge.channel, null));
+    final engine = ExternalPlayerEngine(target: ExternalPlayer.mx, title: 'Episode 11',
+      context: const {}, prepare: () async {}, onReturn: (engine) async {
+        expect(engine.value.position.inMilliseconds, 876000);
+        expect(engine.explicitCompletion, isFalse);
+        await persisted.future;
+      });
+    final commands = <PlayerEngineUiCommand>[];
+    final subscription = engine.uiCommands.listen(commands.add);
+    await engine.open(const PlayerSource(url: 'https://example.com/11.m3u8'), startAt: const Duration(seconds: 250));
+    expect((calls.first.arguments as Map)['positionMs'], 250000);
+    await tester.pump(const Duration(seconds: 1));
+    expect(engine.value.isInitialized, isFalse); // A requested position is not playback evidence.
+    snapshot = {...snapshot, 'observed': true, 'active': false, 'returned': true,
+      'positionMs': 876000, 'durationMs': 1400000};
+    await tester.pump(const Duration(seconds: 1));
+    expect(commands, isEmpty);
+    persisted.complete();
+    await tester.pump();
+    expect(commands, [PlayerEngineUiCommand.exitPlayer]);
+    await engine.dispose();
+    await subscription.cancel();
+  });
+
+  testWidgets('explicit external completion works without inventing a duration', (tester) async {
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(ExternalPlaybackBridge.channel, (call) async => call.method == 'state'
+          ? {'observed': true, 'active': false, 'returned': true, 'completed': true,
+             'positionMs': 0, 'durationMs': 0} : null);
+    addTearDown(() => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(ExternalPlaybackBridge.channel, null));
+    var saved = false;
+    final engine = ExternalPlayerEngine(target: ExternalPlayer.vimu, title: 'Episode 11',
+      context: const {}, prepare: () async {}, onReturn: (_) async { saved = true; });
+    await engine.open(const PlayerSource(url: 'https://example.com/11.m3u8'));
+    await tester.pump(const Duration(seconds: 1));
+    expect(saved, isTrue);
+    expect(engine.explicitCompletion, isTrue);
+    expect(engine.value.duration, Duration.zero);
+    await engine.dispose();
+  });
 }

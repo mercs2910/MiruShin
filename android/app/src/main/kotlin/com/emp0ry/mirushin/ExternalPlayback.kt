@@ -67,7 +67,7 @@ object ExternalPlayback {
                     // A late database save must not erase a newer native checkpoint.
                     if (saved != null && saved.optString("sessionId") == id && saved.optLong("revision") == revision &&
                         current?.optBoolean("active") != true) {
-                        check(prefs(activity).edit().remove(KEY).commit()) { "Checkpoint acknowledgement failed" }
+                        check(prefs(activity).edit().remove(KEY).commit()) { "Не вдалося підтвердити збереження позиції" }
                     }
                     result.success(null)
                 }
@@ -77,12 +77,12 @@ object ExternalPlayback {
                     result.success(current?.takeIf { it.optString("sessionId") == call.argument<String>("sessionId") }?.let(::toMap))
                 }
                 "command" -> {
-                    check(current?.optString("sessionId") == call.argument<String>("sessionId")) { "External playback session changed" }
-                    val c = controller ?: error("The player has not published media controls")
+                    check(current?.optString("sessionId") == call.argument<String>("sessionId")) { "Сеанс відтворення вже змінився" }
+                    val c = controller ?: error("Плеєр не надав доступу до керування відтворенням")
                     val actions = c.playbackState?.actions ?: 0L
                     when (call.argument<String>("command")) {
                         "seek" -> {
-                            require(actions and PlaybackState.ACTION_SEEK_TO != 0L) { "This player does not expose seeking" }
+                            require(actions and PlaybackState.ACTION_SEEK_TO != 0L) { "Цей плеєр не дозволяє зовнішнє перемотування" }
                             c.transportControls.seekTo(call.argument<Number>("positionMs")!!.toLong())
                         }
                         "play" -> c.transportControls.play()
@@ -104,21 +104,21 @@ object ExternalPlayback {
             }
         } catch (e: Exception) {
             // Never include Intent/URL arguments in errors or logs.
-            result.error("external_player", e.message ?: "External playback failed", null)
+            result.error("external_player", e.message ?: "Помилка зовнішнього плеєра", null)
         }
     }
 
     private fun start(activity: Activity, call: MethodCall, result: MethodChannel.Result) {
-        check(allowed(activity)) { "Enable MiruShin playback access in Android notification access settings first" }
-        check(prefs(activity).getString(KEY, null) == null) { "Save the previous external playback checkpoint before starting another video" }
+        check(allowed(activity)) { "Спочатку дозвольте MiruShin доступ у налаштуваннях Android → Доступ до сповіщень" }
+        check(prefs(activity).getString(KEY, null) == null) { "Спочатку збережіть прогрес попереднього відтворення у відповідному обліковому записі" }
         val target = call.argument<String>("target")!!
         val pkg = when (target) {
             "vimu" -> "net.gtvbox.videoplayer"
             "mx", "mxSoftware" -> "com.mxtech.videoplayer.ad"
-            else -> error("Unsupported player")
+            else -> error("Цей плеєр не підтримується")
         }
         val uri = Uri.parse(call.argument<String>("url")!!)
-        require(uri.scheme in listOf("http", "https")) { "External playback currently supports network streams only" }
+        require(uri.scheme in listOf("http", "https")) { "Зовнішній плеєр наразі підтримує лише мережеві джерела" }
         val position = call.argument<Number>("positionMs")!!.toLong().coerceIn(0, Int.MAX_VALUE.toLong()).toInt()
         val title = call.argument<String>("title") ?: "MiruShin"
         val intent = Intent(Intent.ACTION_VIEW).setDataAndType(uri, call.argument<String>("mime") ?: "video/*")
@@ -139,8 +139,11 @@ object ExternalPlayback {
             val headers = call.argument<Map<String, String>>("headers") ?: emptyMap()
             intent.putExtra("headers", headers.flatMap { listOf(it.key, it.value) }.toTypedArray())
         }
-        check(intent.resolveActivity(activity.packageManager) != null) { "Install the selected external player first" }
+        check(intent.resolveActivity(activity.packageManager) != null) { "Спочатку встановіть вибраний зовнішній плеєр" }
+        val requestCode = REQUEST + ((prefs(activity).getInt("requestSequence", 0) + 1) % 4096)
+        check(prefs(activity).edit().putInt("requestSequence", requestCode - REQUEST).commit())
         current = JSONObject().apply {
+            put("requestCode", requestCode)
             put("sessionId", call.argument<String>("sessionId"))
             put("context", JSONObject(call.argument<Map<String, Any?>>("context")!!))
             put("package", pkg)
@@ -158,7 +161,7 @@ object ExternalPlayback {
         commit(activity)
         try {
             @Suppress("DEPRECATION")
-            activity.startActivityForResult(intent, REQUEST)
+            activity.startActivityForResult(intent, requestCode)
         } catch (e: Exception) {
             current = null
             prefs(activity).edit().remove(KEY).commit()
@@ -199,16 +202,17 @@ object ExternalPlayback {
         }
     }
 
-    fun onResult(context: Context, resultCode: Int, data: Intent?) {
+    fun onResult(context: Context, requestCode: Int, resultCode: Int, data: Intent?) {
         val s = current ?: return
+        if (s.optInt("requestCode") != requestCode) return
         sample(context)
         val vimu = s.optString("target") == "vimu"
-        val valid = if (vimu) data?.action == "net.gtvbox.videoplayer.result"
+        val valid = if (vimu) data?.action == null || data.action == "net.gtvbox.videoplayer.result"
             else data?.action == "com.mxtech.intent.result.VIEW"
         val completed = valid && if (vimu) resultCode == 1
             else resultCode == Activity.RESULT_OK && data?.getStringExtra("end_by") == "playback_completion"
-        if (valid) {
-            if (data!!.hasExtra("position")) {
+        if (valid && data != null) {
+            if (data.hasExtra("position")) {
                 s.put("positionMs", data.getIntExtra("position", 0).coerceAtLeast(0))
                 s.put("observed", true)
             }
@@ -231,7 +235,7 @@ object ExternalPlayback {
         val s = current ?: return
         s.put("revision", s.optLong("revision") + 1)
         s.put("updatedAtMs", System.currentTimeMillis())
-        check(prefs(context).edit().putString(KEY, s.toString()).commit()) { "Could not save playback checkpoint" }
+        check(prefs(context).edit().putString(KEY, s.toString()).commit()) { "Не вдалося зберегти позицію відтворення" }
         lastCommit = SystemClock.elapsedRealtime()
     }
 

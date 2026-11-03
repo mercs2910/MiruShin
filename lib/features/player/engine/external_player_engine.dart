@@ -86,12 +86,17 @@ class ExternalPlayerEngine extends PlayerEngine {
       if (_returned) {
         _timer?.cancel();
         await onReturn(this);
+        if (!_disposed && value['error'] == true) {
+          _state.value = _state.value.copyWith(hasError: true,
+            errorDescription: '${target.label} не зміг відтворити відео. Спробуйте інший режим плеєра.');
+          return;
+        }
         if (!_disposed && !explicitCompletion) _commands.add(PlayerEngineUiCommand.exitPlayer);
       }
     } on Object catch (error) {
       if (!_disposed) {
         _state.value = _state.value.copyWith(hasError: true,
-          errorDescription: 'External playback state/save failed: ${error.runtimeType}');
+          errorDescription: 'Не вдалося отримати або зберегти стан зовнішнього плеєра (${error.runtimeType}).');
       }
     } finally { _polling = false; }
   }
