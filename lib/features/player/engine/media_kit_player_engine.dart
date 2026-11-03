@@ -221,7 +221,8 @@ class MediaKitPlayerEngine extends PlayerEngine {
     // below Dart's error boundary on some GPU/driver combinations. Software
     // output keeps MPV available as the first backend while ensuring a failed
     // stream can reach the controller's MPV -> FVP fallback state machine.
-    final bool softwareVideoOutput = Platform.isWindows || source.softwareDecoding;
+    final bool softwareVideoOutput =
+        Platform.isWindows || source.softwareDecoding;
     final mkv.VideoController videoController = mkv.VideoController(
       player,
       configuration: mkv.VideoControllerConfiguration(
@@ -481,7 +482,11 @@ class MediaKitPlayerEngine extends PlayerEngine {
       if (!bufferOnly) ('hr-seek-framedrop', 'no'),
 
       // Hardware decoding
-      if (!bufferOnly) ('hwdec', Platform.isWindows || source.softwareDecoding ? 'no' : 'auto-safe'),
+      if (!bufferOnly)
+        (
+          'hwdec',
+          Platform.isWindows || source.softwareDecoding ? 'no' : 'auto-safe',
+        ),
     ];
 
     if (isNetwork && !bufferOnly) {

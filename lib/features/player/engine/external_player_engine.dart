@@ -11,8 +11,13 @@ import 'player_engine.dart';
 /// The external app owns decoding. This engine only adapts confirmed Android
 /// media state to MiruShin's existing progress, skip and next-episode workers.
 class ExternalPlayerEngine extends PlayerEngine {
-  ExternalPlayerEngine({required this.target, required this.title,
-    required this.context, required this.prepare, required this.onReturn});
+  ExternalPlayerEngine({
+    required this.target,
+    required this.title,
+    required this.context,
+    required this.prepare,
+    required this.onReturn,
+  });
 
   final ExternalPlayer target;
   final String title;
@@ -44,15 +49,24 @@ class ExternalPlayerEngine extends PlayerEngine {
 
   @override
   Widget buildVideoSurface(BuildContext context) => Center(
-    child: Text('Воспроизведение в ${target.label}. Вернитесь кнопкой «Назад».'),
+    child: Text(
+      'Воспроизведение в ${target.label}. Вернитесь кнопкой «Назад».',
+    ),
   );
 
   @override
-  Future<void> open(PlayerSource source, {Duration? startAt, bool autoplay = false}) async {
+  Future<void> open(
+    PlayerSource source, {
+    Duration? startAt,
+    bool autoplay = false,
+  }) async {
     await prepare();
     await ExternalPlaybackBridge.channel.invokeMethod('start', {
-      'sessionId': _sessionId, 'target': target.name, 'title': title,
-      'url': source.url, 'headers': source.headers,
+      'sessionId': _sessionId,
+      'target': target.name,
+      'title': title,
+      'url': source.url,
+      'headers': source.headers,
       'mime': switch (source.streamType) {
         StreamType.hls => 'application/x-mpegURL',
         StreamType.dash => 'application/dash+xml',
@@ -63,14 +77,19 @@ class ExternalPlayerEngine extends PlayerEngine {
     });
     ExternalPlaybackBridge.attachedSessionId = _sessionId;
     // Initial requested position is not an observation and must not be saved.
-    _timer = Timer.periodic(const Duration(seconds: 1), (_) => unawaited(_poll()));
+    _timer = Timer.periodic(
+      const Duration(seconds: 1),
+      (_) => unawaited(_poll()),
+    );
   }
 
   Future<void> _poll() async {
     if (_polling || _disposed || _returned) return;
     _polling = true;
     try {
-      final value = await ExternalPlaybackBridge.map('state', {'sessionId': _sessionId});
+      final value = await ExternalPlaybackBridge.map('state', {
+        'sessionId': _sessionId,
+      });
       if (value == null || _disposed) return;
       explicitCompletion = value['completed'] == true;
       _canControl = value['observed'] == true && value['active'] == true;
@@ -95,8 +114,11 @@ class ExternalPlayerEngine extends PlayerEngine {
         _timer?.cancel();
         await onReturn(this);
         if (!_disposed && value['error'] == true) {
-          _state.value = _state.value.copyWith(hasError: true,
-            errorDescription: '${target.label} не смог воспроизвести видео. Попробуйте другой режим плеера.');
+          _state.value = _state.value.copyWith(
+            hasError: true,
+            errorDescription:
+                '${target.label} не смог воспроизвести видео. Попробуйте другой режим плеера.',
+          );
           return;
         }
         if (!_disposed && !explicitCompletion) {
@@ -105,29 +127,45 @@ class ExternalPlayerEngine extends PlayerEngine {
       }
     } on Object catch (error) {
       if (!_disposed) {
-        _state.value = _state.value.copyWith(hasError: true,
-          errorDescription: 'Не удалось получить или сохранить состояние внешнего плеера (${error.runtimeType}).');
+        _state.value = _state.value.copyWith(
+          hasError: true,
+          errorDescription:
+              'Не удалось получить или сохранить состояние внешнего плеера (${error.runtimeType}).',
+        );
       }
-    } finally { _polling = false; }
+    } finally {
+      _polling = false;
+    }
   }
 
-  Future<void> _command(String command, [Map<String, Object?> args = const {}]) async {
+  Future<void> _command(
+    String command, [
+    Map<String, Object?> args = const {},
+  ]) async {
     if (!_canControl || _disposed || (command == 'seek' && !_canSeek)) return;
     await ExternalPlaybackBridge.channel.invokeMethod('command', {
-      'sessionId': _sessionId, 'command': command, ...args,
+      'sessionId': _sessionId,
+      'command': command,
+      ...args,
     });
   }
+
   @override
   Future<void> play() => _command('play');
   @override
   Future<void> pause() => _command('pause');
   @override
-  Future<void> seekTo(Duration position) => _command('seek', {'positionMs': position.inMilliseconds});
+  Future<void> seekTo(Duration position) =>
+      _command('seek', {'positionMs': position.inMilliseconds});
   @override
   Future<void> setPlaybackSpeed(double speed) async {
-    if (!_canControl) { _startupSpeed = speed; return; }
+    if (!_canControl) {
+      _startupSpeed = speed;
+      return;
+    }
     await _command('speed', {'speed': speed});
   }
+
   @override
   Future<void> setVolume(double volume) async {} // External player uses system volume.
   @override
@@ -142,7 +180,9 @@ class ExternalPlayerEngine extends PlayerEngine {
     if (ExternalPlaybackBridge.attachedSessionId == _sessionId) {
       ExternalPlaybackBridge.attachedSessionId = null;
     }
-    await ExternalPlaybackBridge.channel.invokeMethod('detach', {'sessionId': _sessionId});
+    await ExternalPlaybackBridge.channel.invokeMethod('detach', {
+      'sessionId': _sessionId,
+    });
     await _commands.close();
     _state.dispose();
   }

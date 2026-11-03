@@ -32,7 +32,8 @@ final externalPlayerProvider =
     );
 
 class ExternalPlayerPreference extends AsyncNotifier<ExternalPlayer> {
-  static const key = 'android.externalPlayer'; // Device-local, outside Drive settings.
+  static const key =
+      'android.externalPlayer'; // Device-local, outside Drive settings.
   @override
   Future<ExternalPlayer> build() async {
     if (!supportsExternalPlayback) return ExternalPlayer.internal;
@@ -61,7 +62,10 @@ class ExternalPlaybackBridge {
 
   static Future<void> openAccessSettings() => channel.invokeMethod('settings');
 
-  static Future<Map<String, dynamic>?> map(String method, [Object? args]) async {
+  static Future<Map<String, dynamic>?> map(
+    String method, [
+    Object? args,
+  ]) async {
     final raw = await channel.invokeMapMethod<String, dynamic>(method, args);
     return raw == null ? null : Map<String, dynamic>.from(raw);
   }
@@ -112,57 +116,92 @@ Future<void> _recover(Ref ref) async {
     workspaceId: workspace,
     save: (value) async {
       final context = Map<String, dynamic>.from(value['context'] as Map);
-      final media = MediaItem.fromJson(Map<String, dynamic>.from(context['media'] as Map));
+      final media = MediaItem.fromJson(
+        Map<String, dynamic>.from(context['media'] as Map),
+      );
       final season = (context['season'] as num).toInt();
       final episode = (context['episode'] as num).toDouble();
-      final updatedAt = DateTime.fromMillisecondsSinceEpoch((value['updatedAtMs'] as num).toInt());
-      final previous = await repository.loadEpisodeProgress(mediaId: media.id, season: season, episode: episode);
+      final updatedAt = DateTime.fromMillisecondsSinceEpoch(
+        (value['updatedAtMs'] as num).toInt(),
+      );
+      final previous = await repository.loadEpisodeProgress(
+        mediaId: media.id,
+        season: season,
+        episode: episode,
+      );
       // A recovered checkpoint must never undo newer playback or a deliberate reset.
       if (previous != null && previous.updatedAt.isAfter(updatedAt)) return;
       final duration = (value['durationMs'] as num).toInt() ~/ 1000;
       final position = (value['positionMs'] as num).toInt() ~/ 1000;
-      final ended = value['completed'] == true; // Explicit, documented player result only.
+      final ended =
+          value['completed'] ==
+          true; // Explicit, documented player result only.
       final watched = ended || (duration >= 120 && position >= duration * .85);
       final savedPosition = ended ? 0 : position;
       final savedDuration = duration > 0 ? duration : null;
       // Call the strict repository API: compatibility-cache failures must not
       // falsely acknowledge a checkpoint that SQLite never committed.
       await repository.saveEpisodeProgress(
-        mediaId: media.id, season: season, episode: episode,
-        positionSeconds: savedPosition, durationSeconds: savedDuration,
-        completed: watched, mediaItem: media, occurredAt: updatedAt,
+        mediaId: media.id,
+        season: season,
+        episode: episode,
+        positionSeconds: savedPosition,
+        durationSeconds: savedDuration,
+        completed: watched,
+        mediaItem: media,
+        occurredAt: updatedAt,
       );
-      if (!ref.mounted || ref.read(libraryWorkspaceScopeProvider).workspaceId != workspace) {
+      if (!ref.mounted ||
+          ref.read(libraryWorkspaceScopeProvider).workspaceId != workspace) {
         throw StateError('Во время восстановления изменилась учётная запись');
       }
       await library.saveEpisodeProgress(
-        mediaId: media.id, season: season, episode: episode,
-        positionSeconds: savedPosition, durationSeconds: savedDuration,
-        completed: watched, mediaItem: media, persistCanonical: false,
+        mediaId: media.id,
+        season: season,
+        episode: episode,
+        positionSeconds: savedPosition,
+        durationSeconds: savedDuration,
+        completed: watched,
+        mediaItem: media,
+        persistCanonical: false,
       );
       if (settings.autoAnilistSync) {
         await library.updateWatchProgress(
-          mediaId: media.id, seasonNumber: season, episodeNumber: episode,
-          positionFraction: watched ? 1 : (duration > 0 ? position / duration : null),
+          mediaId: media.id,
+          seasonNumber: season,
+          episodeNumber: episode,
+          positionFraction: watched
+              ? 1
+              : (duration > 0 ? position / duration : null),
         );
         if (watched) {
           await coordinator.pushEpisodeProgress(
-            externalIds: media.externalIds, mediaId: media.id, mediaTitle: media.title,
-            mediaItem: media, episode: episode.round(), total: media.episodeCount,
+            externalIds: media.externalIds,
+            mediaId: media.id,
+            mediaTitle: media.title,
+            mediaItem: media,
+            episode: episode.round(),
+            total: media.episodeCount,
             episodeCheckpoint: TrackingEpisodeCheckpoint(
-              mediaId: media.id, season: season, episode: episode,
-              positionSeconds: savedPosition, durationSeconds: savedDuration, completed: true,
+              mediaId: media.id,
+              season: season,
+              episode: episode,
+              positionSeconds: savedPosition,
+              durationSeconds: savedDuration,
+              completed: true,
             ),
           );
         }
       }
     },
     acknowledge: () async {
-      if (!ref.mounted || ref.read(libraryWorkspaceScopeProvider).workspaceId != workspace) {
+      if (!ref.mounted ||
+          ref.read(libraryWorkspaceScopeProvider).workspaceId != workspace) {
         throw StateError('Во время восстановления изменилась учётная запись');
       }
       await ExternalPlaybackBridge.channel.invokeMethod('ack', {
-        'sessionId': checkpoint['sessionId'], 'revision': checkpoint['revision'],
+        'sessionId': checkpoint['sessionId'],
+        'revision': checkpoint['revision'],
       });
     },
   );

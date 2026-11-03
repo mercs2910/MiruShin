@@ -1236,17 +1236,23 @@ class PlaybackController extends Notifier<PlaybackState> {
         : await ref.read(externalPlayerProvider.future);
     if (generation != _playbackGeneration) return;
     final bool softwareDecoding = external == ExternalPlayer.internalSoftware;
-    final bool externalPlayback = external != ExternalPlayer.internal && !softwareDecoding;
+    final bool externalPlayback =
+        external != ExternalPlayer.internal && !softwareDecoding;
     final List<PlaybackAttempt> attempts = youtubeEmbed
         ? const <PlaybackAttempt>[]
         : externalPlayback
         ? const <PlaybackAttempt>[
-            PlaybackAttempt(backend: PlayerBackend.auto, route: PlaybackRoute.direct),
+            PlaybackAttempt(
+              backend: PlayerBackend.auto,
+              route: PlaybackRoute.direct,
+            ),
           ]
         : attemptPlan ??
               prioritizePlaybackAttempt(
                 _buildPlaybackAttemptPlan(
-                  preference: softwareDecoding ? PlayerBackend.mpv : backendOverride ?? settings.playerBackend,
+                  preference: softwareDecoding
+                      ? PlayerBackend.mpv
+                      : backendOverride ?? settings.playerBackend,
                   url: url,
                   streamType: streamType,
                 ),
@@ -1307,7 +1313,9 @@ class PlaybackController extends Notifier<PlaybackState> {
             target: external,
             title: '${item.title} · ${item.subtitle}',
             context: {
-              'workspaceId': ref.read(libraryWorkspaceScopeProvider).workspaceId,
+              'workspaceId': ref
+                  .read(libraryWorkspaceScopeProvider)
+                  .workspaceId,
               'media': _trackingMediaItem(item).toJson(),
               'season': item.seasonNumber,
               'episode': item.episodeNumber,
@@ -1321,11 +1329,11 @@ class PlaybackController extends Notifier<PlaybackState> {
             },
           )
         : ref.read(playerEngineBuilderProvider)(
-      initialAspectRatio: _safeAspectRatio(preserveAspectRatio),
-      backend: engineBackend,
-      youtubeEmbed: youtubeEmbed,
-      trailerBackLabel: trailerBackLabel,
-    );
+            initialAspectRatio: _safeAspectRatio(preserveAspectRatio),
+            backend: engineBackend,
+            youtubeEmbed: youtubeEmbed,
+            trailerBackLabel: trailerBackLabel,
+          );
     // Own the engine from creation, not only after open(). Closing or replacing
     // a player during async initialization must still find and terminate it.
     _engineForDispose = engine;
@@ -1402,7 +1410,12 @@ class PlaybackController extends Notifier<PlaybackState> {
       _retryCount = 0;
       _updateMediaSession();
       _startProgressSaver();
-      _watchPlaybackProgress(engine, generation, externalPlayback ? null : attempt, position);
+      _watchPlaybackProgress(
+        engine,
+        generation,
+        externalPlayback ? null : attempt,
+        position,
+      );
       if (!engine.managesStartupPlaybackSpeed) {
         _reinforcePlaybackSpeed(engine, generation);
       }
@@ -3914,9 +3927,13 @@ class PlaybackController extends Notifier<PlaybackState> {
       return PlaybackEndEvaluation(
         decision: PlaybackEndDecision.notEnded,
         observedPosition: es.position,
-        authoritativeDuration: es.duration >= const Duration(seconds: 30) ? es.duration : null,
-        watchedThresholdReached: es.duration >= const Duration(minutes: 2) &&
-            es.position.inMilliseconds >= es.duration.inMilliseconds * _watchedFraction,
+        authoritativeDuration: es.duration >= const Duration(seconds: 30)
+            ? es.duration
+            : null,
+        watchedThresholdReached:
+            es.duration >= const Duration(minutes: 2) &&
+            es.position.inMilliseconds >=
+                es.duration.inMilliseconds * _watchedFraction,
       );
     }
     final MediaServer? server = state.server;

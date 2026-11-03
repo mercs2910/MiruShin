@@ -2358,12 +2358,20 @@ class _PlayerEngineSection extends ConsumerWidget {
         if (supportsExternalPlayback) ...<Widget>[
           SettingsRow(
             title: 'Плеер на этом устройстве',
-            subtitle: 'Открывать серии в Vimu или MX Player. Выбор не меняет плеер на Mac.',
+            subtitle:
+                'Открывать серии в Vimu или MX Player. Выбор не меняет плеер на Mac.',
             trailing: DropdownButton<ExternalPlayer>(
-              value: ref.watch(externalPlayerProvider).value ?? ExternalPlayer.internal,
-              items: ExternalPlayer.values.map((value) => DropdownMenuItem(
-                value: value, child: Text(value.label),
-              )).toList(growable: false),
+              value:
+                  ref.watch(externalPlayerProvider).value ??
+                  ExternalPlayer.internal,
+              items: ExternalPlayer.values
+                  .map(
+                    (value) => DropdownMenuItem(
+                      value: value,
+                      child: Text(value.label),
+                    ),
+                  )
+                  .toList(growable: false),
               onChanged: (value) {
                 if (value != null) {
                   ref.read(externalPlayerProvider.notifier).select(value);
@@ -2373,7 +2381,8 @@ class _PlayerEngineSection extends ConsumerWidget {
           ),
           SettingsRow(
             title: 'Сохранение прогресса внешнего плеера',
-            subtitle: 'Разрешите доступ к уведомлениям для позиции воспроизведения и автопропуска. Текст уведомлений не читается. Нужна поддержка управления со стороны плеера.',
+            subtitle:
+                'Разрешите доступ к уведомлениям для позиции воспроизведения и автопропуска. Текст уведомлений не читается. Нужна поддержка управления со стороны плеера.',
             trailing: TextButton(
               onPressed: ExternalPlaybackBridge.openAccessSettings,
               child: const Text('Настроить'),
