@@ -1236,8 +1236,9 @@ class PlaybackController extends Notifier<PlaybackState> {
         : await ref.read(externalPlayerProvider.future);
     if (generation != _playbackGeneration) return;
     final bool softwareDecoding = external == ExternalPlayer.internalSoftware;
+    final bool hardwareCopyBack = external == ExternalPlayer.internalHardwareCopy;
     final bool externalPlayback =
-        external != ExternalPlayer.internal && !softwareDecoding;
+        external != ExternalPlayer.internal && !softwareDecoding && !hardwareCopyBack;
     final List<PlaybackAttempt> attempts = youtubeEmbed
         ? const <PlaybackAttempt>[]
         : externalPlayback
@@ -1250,7 +1251,7 @@ class PlaybackController extends Notifier<PlaybackState> {
         : attemptPlan ??
               prioritizePlaybackAttempt(
                 _buildPlaybackAttemptPlan(
-                  preference: softwareDecoding
+                  preference: softwareDecoding || hardwareCopyBack
                       ? PlayerBackend.mpv
                       : backendOverride ?? settings.playerBackend,
                   url: url,
@@ -1361,6 +1362,7 @@ class PlaybackController extends Notifier<PlaybackState> {
               disableProxy: disableProxy,
               allowDirectFallback: youtubeEmbed,
               softwareDecoding: softwareDecoding,
+              hardwareCopyBack: hardwareCopyBack,
             ),
             startAt: position,
             autoplay: false,

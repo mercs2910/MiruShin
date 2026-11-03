@@ -55,26 +55,14 @@ void main() {
     );
   });
 
-  testWidgets('external return closes the episode route after saving', (
+  testWidgets('external exit closes the episode route before another frame', (
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
-    final saved = Completer<void>();
-    final returnStarted = Completer<void>();
-    var returned = false;
     binding.defaultBinaryMessenger.setMockMethodCallHandler(
       ExternalPlaybackBridge.channel,
-      (call) async => call.method == 'state'
-          ? {
-              'observed': true,
-              'active': !returned,
-              'returned': returned,
-              'completed': false,
-              'positionMs': 381126,
-              'durationMs': 1474431,
-            }
-          : null,
+      (call) async => null,
     );
     addTearDown(
       () => binding.defaultBinaryMessenger.setMockMethodCallHandler(
@@ -82,16 +70,7 @@ void main() {
         null,
       ),
     );
-    final engine = ExternalPlayerEngine(
-      target: ExternalPlayer.vimu,
-      title: 'Episode 11',
-      context: const {},
-      prepare: () async {},
-      onReturn: (_) {
-        returnStarted.complete();
-        return saved.future;
-      },
-    );
+    final engine = _ReturnTestEngine();
     addTearDown(engine.dispose);
     final controller = _FullscreenTestPlaybackController(_item, engine);
     controller.engineAvailable = false;
@@ -139,22 +118,14 @@ void main() {
     // animated loading indicator, so it cannot settle yet.
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    // Native playback can start and return while Flutter renders no frames.
-    await tester.runAsync(() async {
-      controller.attachEngine();
-      await engine.open(
-        const PlayerSource(url: 'https://example.invalid/11.m3u8'),
-      );
-      returned = true;
-      await returnStarted.future.timeout(const Duration(seconds: 3));
-    });
     expect(find.byType(PlayerPage), findsOneWidget);
     expect(controller.stopCalls, 0);
-    await tester.runAsync(() async {
-      saved.complete();
-      await Future<void>.delayed(Duration.zero);
-    });
-    await tester.pumpAndSettle();
+    // A result can arrive after the engine is published, before any rebuild.
+    controller.attachEngine();
+    engine.returnToMiruShin();
+    for (var i = 0; i < 30 && find.byType(PlayerPage).evaluate().isNotEmpty; i++) {
+      await tester.pump(const Duration(milliseconds: 100));
+    }
     expect(find.byType(PlayerPage), findsNothing);
     expect(controller.stopCalls, 1);
     await tester.pumpWidget(const SizedBox.shrink());
@@ -625,6 +596,25 @@ void main() {
     await tester.pump(const Duration(seconds: 3));
     debugDefaultTargetPlatformOverride = null;
   });
+}
+
+class _ReturnTestEngine extends ExternalPlayerEngine {
+  _ReturnTestEngine() : super(
+    target: ExternalPlayer.vimu,
+    title: 'Episode 11',
+    context: const {},
+    prepare: () async {},
+    onReturn: (_) async {},
+  );
+  final _commands = StreamController<PlayerEngineUiCommand>.broadcast(sync: true);
+  @override
+  Stream<PlayerEngineUiCommand> get uiCommands => _commands.stream;
+  void returnToMiruShin() => _commands.add(PlayerEngineUiCommand.exitPlayer);
+  @override
+  Future<void> dispose() async {
+    await _commands.close();
+    await super.dispose();
+  }
 }
 
 class _IdleWatchPartyController extends WatchPartyController {

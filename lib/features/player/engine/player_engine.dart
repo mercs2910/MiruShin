@@ -18,10 +18,12 @@ class PlayerSource {
     this.disableProxy = false,
     this.allowDirectFallback = true,
     this.softwareDecoding = false,
+    this.hardwareCopyBack = false,
   });
 
   final String url;
   final bool softwareDecoding;
+  final bool hardwareCopyBack;
   final Map<String, String> headers;
   final StreamType streamType;
 

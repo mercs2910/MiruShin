@@ -98,6 +98,8 @@ class MediaKitPlayerEngine extends PlayerEngine {
   mk.Player? _player;
   mkv.VideoController? _videoController;
   Timer? _positionTimer;
+  Timer? _nativeDiagnosticsTimer;
+  bool _samplingNativeDiagnostics = false;
   Timer? _openTimeoutTimer;
   Timer? _startupRetryTimer;
   final List<StreamSubscription<dynamic>> _subscriptions =
@@ -226,7 +228,9 @@ class MediaKitPlayerEngine extends PlayerEngine {
     final mkv.VideoController videoController = mkv.VideoController(
       player,
       configuration: mkv.VideoControllerConfiguration(
-        hwdec: softwareVideoOutput ? 'no' : null,
+        hwdec: softwareVideoOutput || (Platform.isAndroid && source.hardwareCopyBack)
+            ? _hwdecFor(source)
+            : null,
         enableHardwareAcceleration: !softwareVideoOutput,
       ),
     );
@@ -235,6 +239,11 @@ class MediaKitPlayerEngine extends PlayerEngine {
 
     _attachListeners(player);
     _startPositionTimer();
+    _nativeDiagnosticsTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      if (PlayerDiagnostics.instance.enabled) {
+        unawaited(_sampleNativeDiagnostics(player));
+      }
+    });
     _startOpenTimeout();
 
     try {
@@ -429,6 +438,36 @@ class MediaKitPlayerEngine extends PlayerEngine {
         lower.contains('.mpd?');
   }
 
+  String _hwdecFor(PlayerSource source) {
+    if (Platform.isWindows || source.softwareDecoding) return 'no';
+    if (Platform.isAndroid && source.hardwareCopyBack) return 'mediacodec-copy';
+    return 'auto-safe';
+  }
+
+  Future<void> _sampleNativeDiagnostics(mk.Player player) async {
+    if (_samplingNativeDiagnostics || _player != player) return;
+    final native = player.platform;
+    if (native is! mk.NativePlayer) return;
+    _samplingNativeDiagnostics = true;
+    try {
+      final values = <String, Object?>{};
+      for (final property in const ['hwdec-current', 'video-format',
+        'frame-drop-count', 'decoder-frame-drop-count', 'avsync']) {
+        try {
+          values[property] = await native.getProperty(property);
+        } on Object {
+          // Older bundled mpv versions may omit individual statistics.
+        }
+      }
+      if (_player != player || !PlayerDiagnostics.instance.enabled) return;
+      values['positionMs'] = player.state.position.inMilliseconds;
+      PlayerDiagnostics.instance.record('mpv.decoder', values);
+      debugPrint('MiruMpv: $values');
+    } finally {
+      _samplingNativeDiagnostics = false;
+    }
+  }
+
   // Applies MPV buffer, cache, and network properties.
   //
   // All critical properties are awaited in parallel via Future.wait so they are
@@ -485,7 +524,7 @@ class MediaKitPlayerEngine extends PlayerEngine {
       if (!bufferOnly)
         (
           'hwdec',
-          Platform.isWindows || source.softwareDecoding ? 'no' : 'auto-safe',
+          _hwdecFor(source),
         ),
     ];
 
@@ -1324,6 +1363,8 @@ class MediaKitPlayerEngine extends PlayerEngine {
   }
 
   Future<void> _disposePlayerOnly() async {
+    _nativeDiagnosticsTimer?.cancel();
+    _nativeDiagnosticsTimer = null;
     _openGeneration += 1;
     _positionTimer?.cancel();
     _positionTimer = null;

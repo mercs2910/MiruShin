@@ -14,6 +14,7 @@ import 'player_settings.dart';
 
 enum ExternalPlayer {
   internal('MiruShin'),
+  internalHardwareCopy('MiruShin · аппаратное (совместимость)'),
   internalSoftware('MiruShin · программное декодирование'),
   vimu('Vimu'),
   mx('MX Player'),

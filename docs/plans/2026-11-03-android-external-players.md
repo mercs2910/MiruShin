@@ -10,6 +10,13 @@ the external players. Include a device-local internal software-decoding choice
 to bypass the stalled Realtek codec while retaining the full internal feature set.
 This is the agreed design lock (brainstorming light mode); implementation follows.
 
+The user later clarified that reliable hardware decoding should be the priority;
+software decoding remains a fallback. Vimu and MX hardware paths have already
+played past the original failure window. Add an isolated internal hardware-copy
+compatibility experiment and verify actual `hwdec-current`, not just the selected
+setting. This preserves the internal player controls while testing a different
+frame transfer path; it does not claim to repair the closed Realtek driver.
+
 ## Evidence
 
 - RockTek/Skyworth RTD1325, Android 14, armeabi-v7a, MiruShin 2.9.24.
