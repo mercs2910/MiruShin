@@ -10,12 +10,12 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mirushin/app/localization/app_localizations.dart';
-import 'package:mirushin/features/player/application/playback_controller.dart';
 import 'package:mirushin/features/player/application/external_playback.dart';
+import 'package:mirushin/features/player/application/playback_controller.dart';
 import 'package:mirushin/features/player/data/pip_controller.dart';
 import 'package:mirushin/features/player/domain/player_models.dart';
-import 'package:mirushin/features/player/engine/player_engine.dart';
 import 'package:mirushin/features/player/engine/external_player_engine.dart';
+import 'package:mirushin/features/player/engine/player_engine.dart';
 import 'package:mirushin/features/player/presentation/player_page.dart';
 import 'package:mirushin/features/watch_party/application/watch_party_controller.dart';
 import 'package:mirushin/features/watch_party/domain/watch_party_models.dart';
@@ -55,25 +55,32 @@ void main() {
     );
   });
 
-  testWidgets('external return closes the episode route after saving', (tester) async {
+  testWidgets('external return closes the episode route after saving', (
+    tester,
+  ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final saved = Completer<void>();
     var returned = false;
     binding.defaultBinaryMessenger.setMockMethodCallHandler(
       ExternalPlaybackBridge.channel,
-      (call) async => call.method == 'state' ? {
-        'observed': true,
-        'active': !returned,
-        'returned': returned,
-        'completed': false,
-        'positionMs': 381126,
-        'durationMs': 1474431,
-      } : null,
+      (call) async => call.method == 'state'
+          ? {
+              'observed': true,
+              'active': !returned,
+              'returned': returned,
+              'completed': false,
+              'positionMs': 381126,
+              'durationMs': 1474431,
+            }
+          : null,
     );
-    addTearDown(() => binding.defaultBinaryMessenger.setMockMethodCallHandler(
-      ExternalPlaybackBridge.channel, null,
-    ));
+    addTearDown(
+      () => binding.defaultBinaryMessenger.setMockMethodCallHandler(
+        ExternalPlaybackBridge.channel,
+        null,
+      ),
+    );
     final engine = ExternalPlayerEngine(
       target: ExternalPlayer.vimu,
       title: 'Episode 11',
@@ -83,36 +90,53 @@ void main() {
     );
     addTearDown(engine.dispose);
     final controller = _FullscreenTestPlaybackController(_item, engine);
-    final router = GoRouter(routes: [
-      GoRoute(path: '/', builder: (context, state) => FilledButton(
-        onPressed: () => context.push<void>('/player'),
-        child: const Text('Open player'),
-      )),
-      GoRoute(path: '/player', builder: (context, state) => const PlayerPage(item: _item)),
-    ]);
-    addTearDown(router.dispose);
-    await tester.pumpWidget(ProviderScope(
-      overrides: [
-        playbackControllerProvider.overrideWith(() => controller),
-        watchPartyProvider.overrideWith(_IdleWatchPartyController.new),
-        pipControllerProvider.overrideWithValue(const UnsupportedPipController()),
+    final router = GoRouter(
+      routes: [
+        GoRoute(
+          path: '/',
+          builder: (context, state) => FilledButton(
+            onPressed: () => context.push<void>('/player'),
+            child: const Text('Open player'),
+          ),
+        ),
+        GoRoute(
+          path: '/player',
+          builder: (context, state) => const PlayerPage(item: _item),
+        ),
       ],
-      child: MaterialApp.router(
-        routerConfig: router,
-        locale: const Locale('en'),
-        supportedLocales: AppLocalizations.supportedLocales,
-        localizationsDelegates: const [
-          AppLocalizations.delegate,
-          GlobalMaterialLocalizations.delegate,
-          GlobalWidgetsLocalizations.delegate,
-          GlobalCupertinoLocalizations.delegate,
+    );
+    addTearDown(router.dispose);
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          playbackControllerProvider.overrideWith(() => controller),
+          watchPartyProvider.overrideWith(_IdleWatchPartyController.new),
+          pipControllerProvider.overrideWithValue(
+            const UnsupportedPipController(),
+          ),
         ],
+        child: MaterialApp.router(
+          routerConfig: router,
+          locale: const Locale('en'),
+          supportedLocales: AppLocalizations.supportedLocales,
+          localizationsDelegates: const [
+            AppLocalizations.delegate,
+            GlobalMaterialLocalizations.delegate,
+            GlobalWidgetsLocalizations.delegate,
+            GlobalCupertinoLocalizations.delegate,
+          ],
+        ),
       ),
-    ));
+    );
     await tester.pumpAndSettle();
     await tester.tap(find.text('Open player'));
-    await tester.pumpAndSettle();
-    await engine.open(const PlayerSource(url: 'https://example.invalid/11.m3u8'));
+    // Before the first native observation the player intentionally shows an
+    // animated loading indicator, so it cannot settle yet.
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 300));
+    await engine.open(
+      const PlayerSource(url: 'https://example.invalid/11.m3u8'),
+    );
     returned = true;
     await tester.pump(const Duration(seconds: 1));
     await tester.pump();
