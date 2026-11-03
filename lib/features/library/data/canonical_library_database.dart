@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:drift/drift.dart';
 
 import 'canonical_library_database_open.dart';
@@ -262,6 +264,16 @@ class CanonicalLibraryDatabase extends _$CanonicalLibraryDatabase {
 
   @override
   int get schemaVersion => 3;
+
+  /// Riverpod pauses watch() subscriptions of screens hidden behind another
+  /// route. Drift's close() first waits for every stream listener to receive
+  /// `done`, which a paused one never does, so the native connection stayed
+  /// open and macOS exit hung. Close the streams without waiting for them.
+  @override
+  Future<void> close() async {
+    unawaited(connection.streamQueries.close());
+    await connection.executor.close();
+  }
 
   @override
   MigrationStrategy get migration => MigrationStrategy(

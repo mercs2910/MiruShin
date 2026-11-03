@@ -102,6 +102,30 @@ void main() {
     },
   );
 
+  test('a paused watch subscription does not block exit', () async {
+    final database = CanonicalLibraryDatabase(NativeDatabase.memory());
+    final registry = CanonicalLibraryDatabaseRegistry()..register(database);
+    final firstRows = Completer<void>();
+    final subscription = database
+        .customSelect('SELECT 1', readsFrom: {database.episodeStateRecords})
+        .watch()
+        .listen((_) {
+          if (!firstRows.isCompleted) firstRows.complete();
+        });
+    await firstRows.future;
+    // Riverpod pauses providers whose widgets are hidden behind the player.
+    subscription.pause();
+    try {
+      await registry.closeAll().timeout(const Duration(seconds: 5));
+      await expectLater(
+        database.customSelect('SELECT 1').get(),
+        throwsStateError,
+      );
+    } finally {
+      await subscription.cancel();
+    }
+  });
+
   test(
     'native read-pool connections are drained and closed before exit',
     () async {
