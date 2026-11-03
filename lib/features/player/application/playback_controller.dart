@@ -29,16 +29,16 @@ import '../domain/playback_end_decision.dart';
 import '../domain/player_models.dart';
 import '../domain/player_volume_policy.dart';
 import '../domain/seek_settle.dart';
-import '../engine/local_hls_proxy.dart';
 import '../engine/external_player_engine.dart';
+import '../engine/local_hls_proxy.dart';
 import '../engine/player_engine.dart';
 import '../engine/player_engine_factory.dart';
 import '../engine/seek_thumbnail.dart';
 import '../engine/seek_thumbnail_extractor.dart';
 import '../engine/seek_thumbnail_source.dart';
 import '../engine/stream_url_policy.dart';
-import 'playback_activity.dart';
 import 'external_playback.dart';
+import 'playback_activity.dart';
 import 'player_settings.dart';
 import 'resume_stability.dart';
 

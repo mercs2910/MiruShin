@@ -40,8 +40,8 @@ import '../../library/presentation/google_drive_login_flow.dart';
 import '../../metadata/application/metadata_cache_provider.dart';
 import '../../metadata/application/metadata_providers.dart';
 import '../../metadata/data/tmdb_metadata_provider.dart';
-import '../../player/application/player_settings.dart';
 import '../../player/application/external_playback.dart';
+import '../../player/application/player_settings.dart';
 import '../../player/data/discord_rpc_service.dart';
 import '../../player/domain/player_models.dart';
 import '../../player/presentation/widgets/player_diagnostics_controls.dart';
@@ -2365,7 +2365,9 @@ class _PlayerEngineSection extends ConsumerWidget {
                 value: value, child: Text(value.label),
               )).toList(growable: false),
               onChanged: (value) {
-                if (value != null) ref.read(externalPlayerProvider.notifier).select(value);
+                if (value != null) {
+                  ref.read(externalPlayerProvider.notifier).select(value);
+                }
               },
             ),
           ),

@@ -99,7 +99,9 @@ class ExternalPlayerEngine extends PlayerEngine {
             errorDescription: '${target.label} не смог воспроизвести видео. Попробуйте другой режим плеера.');
           return;
         }
-        if (!_disposed && !explicitCompletion) _commands.add(PlayerEngineUiCommand.exitPlayer);
+        if (!_disposed && !explicitCompletion) {
+          _commands.add(PlayerEngineUiCommand.exitPlayer);
+        }
       }
     } on Object catch (error) {
       if (!_disposed) {
