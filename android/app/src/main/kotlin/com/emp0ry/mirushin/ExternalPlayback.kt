@@ -18,6 +18,7 @@ import android.service.notification.NotificationListenerService
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import org.json.JSONObject
+import org.json.JSONArray
 
 /** Observes only the launched player package; never reads notification content. */
 class ExternalPlaybackListener : NotificationListenerService() {
@@ -239,11 +240,14 @@ object ExternalPlayback {
         lastCommit = SystemClock.elapsedRealtime()
     }
 
+    private fun jsonValue(value: Any?): Any? = when (value) {
+        is JSONObject -> toMap(value)
+        is JSONArray -> (0 until value.length()).map { jsonValue(value.get(it)) }
+        JSONObject.NULL -> null
+        else -> value
+    }
+
     private fun toMap(json: JSONObject): Map<String, Any?> = json.keys().asSequence().associateWith {
-        when (val value = json.get(it)) {
-            is JSONObject -> toMap(value)
-            JSONObject.NULL -> null
-            else -> value
-        }
+        jsonValue(json.get(it))
     }
 }
