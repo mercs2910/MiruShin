@@ -61,6 +61,7 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     final saved = Completer<void>();
+    final returnStarted = Completer<void>();
     var returned = false;
     binding.defaultBinaryMessenger.setMockMethodCallHandler(
       ExternalPlaybackBridge.channel,
@@ -86,10 +87,14 @@ void main() {
       title: 'Episode 11',
       context: const {},
       prepare: () async {},
-      onReturn: (_) => saved.future,
+      onReturn: (_) {
+        returnStarted.complete();
+        return saved.future;
+      },
     );
     addTearDown(engine.dispose);
     final controller = _FullscreenTestPlaybackController(_item, engine);
+    controller.engineAvailable = false;
     final router = GoRouter(
       routes: [
         GoRoute(
@@ -134,15 +139,21 @@ void main() {
     // animated loading indicator, so it cannot settle yet.
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
-    await engine.open(
-      const PlayerSource(url: 'https://example.invalid/11.m3u8'),
-    );
-    returned = true;
-    await tester.pump(const Duration(seconds: 1));
-    await tester.pump();
+    // Native playback can start and return while Flutter renders no frames.
+    await tester.runAsync(() async {
+      controller.attachEngine();
+      await engine.open(
+        const PlayerSource(url: 'https://example.invalid/11.m3u8'),
+      );
+      returned = true;
+      await returnStarted.future.timeout(const Duration(seconds: 3));
+    });
     expect(find.byType(PlayerPage), findsOneWidget);
     expect(controller.stopCalls, 0);
-    saved.complete();
+    await tester.runAsync(() async {
+      saved.complete();
+      await Future<void>.delayed(Duration.zero);
+    });
     await tester.pumpAndSettle();
     expect(find.byType(PlayerPage), findsNothing);
     expect(controller.stopCalls, 1);
@@ -626,6 +637,7 @@ class _FullscreenTestPlaybackController extends PlaybackController {
 
   final MediaPlaybackItem item;
   final PlayerEngine engine;
+  bool engineAvailable = true;
   int stopCalls = 0;
   int markWatchedCalls = 0;
   int testPlaybackGeneration = 0;
@@ -642,7 +654,7 @@ class _FullscreenTestPlaybackController extends PlaybackController {
   @override
   PlaybackState build() => PlaybackState(
     item: item,
-    engine: engine,
+    engine: engineAvailable ? engine : null,
     server: item.servers.single,
     quality: StreamQuality.auto,
     controlsVisible: true,
@@ -663,6 +675,10 @@ class _FullscreenTestPlaybackController extends PlaybackController {
 
   void removeEngine() {
     state = state.copyWith(clearEngine: true);
+  }
+
+  void attachEngine() {
+    state = state.copyWith(engine: engine);
   }
 
   @override

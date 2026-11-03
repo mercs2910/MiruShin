@@ -278,6 +278,16 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
     _windowPipSupported =
         !kIsWeb && defaultTargetPlatform == TargetPlatform.windows;
     _playbackNotifier = ref.read(playbackControllerProvider.notifier);
+    // External activities can return while Flutter has no scheduled frames.
+    // Subscribe as soon as the controller publishes its engine, not in build.
+    ref.listenManual(playbackControllerProvider, (_, next) {
+      _attachTrailerCommands(
+        _isYoutubeTrailerPlayback(next, widget.item) ||
+                next.engine is ExternalPlayerEngine
+            ? next.engine
+            : null,
+      );
+    }, fireImmediately: true);
     _timelineInteractions = TimelineInteractionTracker(
       _handleTimelineInteractionChanged,
     );
@@ -1515,11 +1525,6 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       state.item?.skipMarkers ?? widget.item.skipMarkers,
     );
     final bool isYoutubeTrailer = _isYoutubeTrailerPlayback(state, widget.item);
-    _attachTrailerCommands(
-      isYoutubeTrailer || state.engine is ExternalPlayerEngine
-          ? state.engine
-          : null,
-    );
     if (isYoutubeTrailer) {
       _autoNextTimer?.cancel();
       _autoNextTimer = null;
