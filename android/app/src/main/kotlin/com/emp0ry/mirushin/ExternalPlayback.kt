@@ -222,6 +222,13 @@ object ExternalPlayback {
             else data?.action == "com.mxtech.intent.result.VIEW"
         val completed = valid && if (vimu) resultCode == 1
             else resultCode == Activity.RESULT_OK && data?.getStringExtra("end_by") == "playback_completion"
+        val endBy = when (data?.getStringExtra("end_by")) {
+            "playback_completion" -> "playback_completion"
+            "user" -> "user"
+            null -> "absent"
+            else -> "other"
+        }
+        Log.i("MiruExternal", "result valid=$valid code=$resultCode completed=$completed endBy=$endBy")
         if (valid && data != null) {
             if (data.hasExtra("decode_mode")) s.put("decoderMode", data.getByteExtra("decode_mode", 0.toByte()).toInt())
             if (data.hasExtra("position")) {

@@ -18,6 +18,7 @@ import android.media.MediaMetadata
 import android.media.session.MediaSession
 import android.media.session.PlaybackState
 import android.os.Build
+import android.os.Bundle
 import android.os.SystemClock
 import android.util.Rational
 import android.view.MotionEvent
@@ -65,6 +66,16 @@ class MainActivity : FlutterActivity() {
     // takes effect for the whole UI. No-op on phones/tablets.
     override fun attachBaseContext(base: Context) {
         super.attachBaseContext(adjustDensityForTelevision(base))
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        DiagnosticLibraryCounts.handle(this, intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        DiagnosticLibraryCounts.handle(this, intent)
     }
 
     private fun adjustDensityForTelevision(context: Context): Context {
