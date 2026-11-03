@@ -129,7 +129,9 @@ object ExternalPlayback {
             intent.setPackage(pkg)
             intent.putExtra("forcename", title)
             intent.putExtra("startfrom", position)
-            intent.putExtra("forceresume", true)
+            // MiruShin owns the resume point. Vimu's own history can be older
+            // than the position synced from another device and prompts first.
+            intent.putExtra("forceresume", false)
         } else {
             // MX omits HTTP result callbacks without an explicit activity component.
             intent.setClassName(pkg, if (pkg == "dev.anilbeesetti.nextplayer")
