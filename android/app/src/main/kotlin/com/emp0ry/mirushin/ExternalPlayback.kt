@@ -249,7 +249,7 @@ object ExternalPlayback {
         s.put("updatedAtMs", System.currentTimeMillis())
         check(prefs(context).edit().putString(KEY, s.toString()).commit()) { "Не удалось сохранить позицию воспроизведения" }
         if (s.getJSONObject("context").optBoolean("diagnostics")) {
-            Log.i("MiruExternal", "saved positionMs=${s.optLong("positionMs")} durationMs=${s.optLong("durationMs")} revision=${s.optLong("revision")} observed=${s.optBoolean("observed")} completed=${s.optBoolean("completed")} decoderMode=${s.optInt("decoderMode")}")
+            Log.i("MiruExternal", "saved positionMs=${s.optLong("positionMs")} durationMs=${s.optLong("durationMs")} revision=${s.optLong("revision")} observed=${s.optBoolean("observed")} completed=${s.optBoolean("completed")} active=${s.optBoolean("active")} returned=${s.optBoolean("returned")} decoderMode=${s.optInt("decoderMode")}")
         }
         lastCommit = SystemClock.elapsedRealtime()
     }

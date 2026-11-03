@@ -24,6 +24,7 @@ import '../data/subtitle_loader.dart';
 import '../domain/auto_skip.dart';
 import '../domain/player_models.dart';
 import '../domain/player_volume_policy.dart';
+import '../engine/external_player_engine.dart';
 import '../engine/player_engine.dart';
 import '../engine/seek_thumbnail.dart';
 import 'widgets/auto_next_overlay.dart';
@@ -1514,12 +1515,15 @@ class _PlayerPageState extends ConsumerState<PlayerPage>
       state.item?.skipMarkers ?? widget.item.skipMarkers,
     );
     final bool isYoutubeTrailer = _isYoutubeTrailerPlayback(state, widget.item);
+    _attachTrailerCommands(
+      isYoutubeTrailer || state.engine is ExternalPlayerEngine
+          ? state.engine
+          : null,
+    );
     if (isYoutubeTrailer) {
-      _attachTrailerCommands(state.engine);
       _autoNextTimer?.cancel();
       _autoNextTimer = null;
     } else {
-      _attachTrailerCommands(null);
       _maybeScheduleAutoNext(state, settings);
     }
 
