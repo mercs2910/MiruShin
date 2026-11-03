@@ -35,6 +35,8 @@ import 'canonical_library_repository.dart';
 
 // Keep the existing preference key when persisting lightweight completions.
 const String _googleDriveLastSyncAtKey = 'google.drive.lastFullSyncAt.v1';
+// Not a silent cut-off: a failed attempt asks the user to retry or close.
+const Duration _exitFlushTimeout = Duration(seconds: 20);
 
 class GoogleDriveSyncState {
   const GoogleDriveSyncState({
@@ -841,6 +843,76 @@ class GoogleDriveSyncController extends AsyncNotifier<GoogleDriveSyncState> {
       // Shutdown continues after the active operation has unwound its finally
       // blocks. Its user-facing error state is intentionally irrelevant here.
     }
+  }
+
+  /// Uploads only this device's pending watch positions and Library changes
+  /// after [prepareForExit]. No pull and no checkpoint keeps quitting fast,
+  /// while another device still gets the last episode. Returns false when the
+  /// upload failed; the durable queue then waits for the next launch.
+  Future<bool> flushBeforeExit() async {
+    final GoogleDriveSyncState? current = state.value;
+    if (_disposed ||
+        _cloudDataDeletionActive ||
+        current == null ||
+        !current.configured ||
+        !current.connected) {
+      return true;
+    }
+    final CancelToken cancelToken = CancelToken();
+    final Future<bool> work = _flushBeforeExit(cancelToken);
+    try {
+      return await work.timeout(_exitFlushTimeout);
+    } on TimeoutException {
+      cancelToken.cancel('MiruShin exit sync timed out.');
+      // Let in-flight SQLite writes settle before the databases are closed.
+      await work.then((_) {}, onError: (Object _) {});
+      return false;
+    } on Object catch (error) {
+      debugPrint('Google Drive exit sync failed: $error');
+      return false;
+    }
+  }
+
+  Future<bool> _flushBeforeExit(CancelToken cancelToken) async {
+    final CanonicalLibraryRepository repository = ref.read(
+      canonicalLibraryRepositoryProvider,
+    );
+    final bool libraryEnabled = ref
+        .read(settingsProvider)
+        .googleDriveLibrarySyncEnabled;
+    final String? token = await _validAccessToken(cancelToken: cancelToken);
+    if (token == null || token.isEmpty) return false;
+    await PlaybackDriveSyncService(repository: repository).pushPending(
+      cloud: GoogleDriveCloudReplica(
+        dio: ref.read(googleDriveDioFactoryProvider)(),
+        accessToken: token,
+        replicaNamespace: repository.replicaNamespace,
+        cancelToken: cancelToken,
+      ),
+    );
+    if (!libraryEnabled) return true;
+    final GoogleDriveCloudReplica libraryCloud = GoogleDriveCloudReplica(
+      dio: ref.read(googleDriveDioFactoryProvider)(),
+      accessToken: token,
+      replicaNamespace: repository.replicaNamespace,
+      includeLegacyLibrary: repository.importsLegacyData,
+      cancelToken: cancelToken,
+    );
+    // Bounded like the regular push: a segment that never settles cannot spin.
+    int remaining = await repository.pendingDriveDeliveryCount();
+    DriveReplicaSegment? outgoing = remaining > 0
+        ? await repository.buildPendingDriveSegment()
+        : null;
+    while (outgoing != null && remaining > 0) {
+      final CloudReplicaFile file = await libraryCloud.pushSegment(outgoing);
+      await repository.markDriveSegmentDelivered(
+        outgoing,
+        remoteFileId: file.id,
+      );
+      remaining -= outgoing.operations.length;
+      outgoing = await repository.buildPendingDriveSegment();
+    }
+    return true;
   }
 
   Future<int> deleteCloudDataAndDisconnect() async {

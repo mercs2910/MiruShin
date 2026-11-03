@@ -1614,5 +1614,8 @@
   "Some data could not be synced: {items}. MiruShin will retry.": "Some data could not be synced: {items}. MiruShin will retry.",
   "Syncing watch positions…": "Syncing watch positions…",
   "Watch progress": "Watch progress",
-  "Google Drive · Watch progress": "Google Drive · Watch progress"
+  "Google Drive · Watch progress": "Google Drive · Watch progress",
+  "Syncing before closing…": "Syncing before closing…",
+  "Could not sync your latest changes. They will be sent the next time MiruShin opens.": "Could not sync your latest changes. They will be sent the next time MiruShin opens.",
+  "Close without syncing": "Close without syncing"
 }

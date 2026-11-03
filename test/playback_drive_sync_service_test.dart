@@ -538,4 +538,35 @@ void main() {
       expect(utf8.encode(before).length, lessThan(3000));
     },
   );
+
+  test(
+    'exit push uploads the last position once and keeps it queued on failure',
+    () async {
+      final a = repository();
+      final b = repository();
+      final cloud = MemoryPlaybackCloud();
+      final service = PlaybackDriveSyncService(repository: a);
+      await save(a, 300, 1);
+
+      cloud.failPush = true;
+      await expectLater(service.pushPending(cloud: cloud), throwsStateError);
+      expect(await a.pendingPlaybackDeliveryIds(), isNotEmpty);
+
+      cloud.failPush = false;
+      await service.pushPending(cloud: cloud);
+      await service.pushPending(cloud: cloud);
+      expect(cloud.uploads, 1);
+      expect(await a.pendingPlaybackDeliveryIds(), isEmpty);
+
+      await sync(b, cloud);
+      expect(
+        (await b.loadEpisodeProgress(
+          mediaId: 'mal:20',
+          season: 1,
+          episode: 2.5,
+        ))?.positionSeconds,
+        300,
+      );
+    },
+  );
 }

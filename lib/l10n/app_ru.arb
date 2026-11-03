@@ -1619,5 +1619,8 @@
   "Some data could not be synced: {items}. MiruShin will retry.": "Не удалось синхронизировать часть данных: {items}. MiruShin повторит попытку.",
   "Syncing watch positions…": "Синхронизация позиций просмотра…",
   "Watch progress": "Прогресс просмотра",
-  "Google Drive · Watch progress": "Google Drive · Прогресс просмотра"
+  "Google Drive · Watch progress": "Google Drive · Прогресс просмотра",
+  "Syncing before closing…": "Синхронизация перед закрытием…",
+  "Could not sync your latest changes. They will be sent the next time MiruShin opens.": "Не удалось синхронизировать последние изменения. Они будут отправлены при следующем запуске MiruShin.",
+  "Close without syncing": "Закрыть без синхронизации"
 }

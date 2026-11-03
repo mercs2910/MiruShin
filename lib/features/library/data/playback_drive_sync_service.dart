@@ -41,4 +41,22 @@ class PlaybackDriveSyncService {
       deliveryIds: pending,
     );
   }
+
+  /// Upload-only pass for app exit: replaces this device's own file, so other
+  /// devices see the last position without pulling and merging theirs first.
+  Future<void> pushPending({required PlaybackCloudReplica cloud}) async {
+    final pending = await repository.pendingPlaybackDeliveryIds();
+    final outgoing = await repository.buildPlaybackSnapshot();
+    if (outgoing.isEmpty ||
+        (pending.isEmpty &&
+            outgoing.contentChecksum ==
+                await repository.lastPlaybackChecksum())) {
+      return;
+    }
+    await cloud.pushPlaybackSnapshot(outgoing);
+    await repository.markPlaybackSynced(
+      outgoing.contentChecksum,
+      deliveryIds: pending,
+    );
+  }
 }

@@ -57,6 +57,8 @@ class _MiruShinAppState extends ConsumerState<MiruShinApp> {
   late final Future<void> Function() _stopTrackerReconciliation;
   final NativeExitHandshake _nativeExitHandshake = NativeExitHandshake();
   Future<void>? _exitCleanup;
+  final ValueNotifier<_ExitSync?> _exitSync = ValueNotifier<_ExitSync?>(null);
+  Completer<bool>? _exitSyncRetry;
 
   @override
   void initState() {
@@ -157,6 +159,8 @@ class _MiruShinAppState extends ConsumerState<MiruShinApp> {
           // Native WebView teardown is best-effort during process exit.
         }),
       ]);
+      // After the final checkpoint and before the databases close.
+      await step('Drive upload', _flushDriveBeforeExit());
       // This must be the final step: all sync/database users are stopped first,
       // then Drift is closed and awaited before Flutter tears down the Dart VM.
       await step('library databases', _libraryDatabaseRegistry.closeAll());
@@ -164,6 +168,28 @@ class _MiruShinAppState extends ConsumerState<MiruShinApp> {
         'MiruShin shutdown: ready in ${elapsed.elapsedMilliseconds}ms.',
       );
     }();
+  }
+
+  /// macOS keeps the window open until cleanup replies, so a failed upload can
+  /// ask the user. Elsewhere the OS may kill the process: one best-effort try.
+  Future<void> _flushDriveBeforeExit() async {
+    final bool interactive =
+        !kIsWeb && defaultTargetPlatform == TargetPlatform.macOS;
+    while (true) {
+      if (interactive) _exitSync.value = _ExitSync.syncing;
+      final bool synced = await _googleDriveSyncController.flushBeforeExit();
+      if (synced || !interactive) break;
+      _exitSync.value = _ExitSync.failed;
+      final Completer<bool> retry = _exitSyncRetry = Completer<bool>();
+      if (!await retry.future) break;
+    }
+    _exitSync.value = null;
+  }
+
+  void _answerExitSync(bool retry) {
+    final Completer<bool>? pending = _exitSyncRetry;
+    _exitSyncRetry = null;
+    if (pending != null && !pending.isCompleted) pending.complete(retry);
   }
 
   @override
@@ -200,6 +226,7 @@ class _MiruShinAppState extends ConsumerState<MiruShinApp> {
             children: <Widget>[
               child ?? const SizedBox.shrink(),
               const _AniListLibraryWarmup(),
+              _ExitSyncOverlay(status: _exitSync, onAnswer: _answerExitSync),
             ],
           ),
         );
@@ -335,5 +362,80 @@ class _AniListLibraryWarmupState extends ConsumerState<_AniListLibraryWarmup> {
     }
 
     return const SizedBox.shrink();
+  }
+}
+
+enum _ExitSync { syncing, failed }
+
+class _ExitSyncOverlay extends StatelessWidget {
+  const _ExitSyncOverlay({required this.status, required this.onAnswer});
+
+  final ValueListenable<_ExitSync?> status;
+  final ValueChanged<bool> onAnswer;
+
+  @override
+  Widget build(BuildContext context) {
+    return ValueListenableBuilder<_ExitSync?>(
+      valueListenable: status,
+      builder: (BuildContext context, _ExitSync? value, _) {
+        if (value == null) return const SizedBox.shrink();
+        final bool failed = value == _ExitSync.failed;
+        return Positioned.fill(
+          child: Stack(
+            children: <Widget>[
+              const ModalBarrier(dismissible: false, color: Colors.black54),
+              Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 380),
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          if (!failed) ...<Widget>[
+                            const CircularProgressIndicator(),
+                            const SizedBox(height: 16),
+                          ],
+                          Text(
+                            context.t(
+                              failed
+                                  ? 'Could not sync your latest changes. They will be sent the next time MiruShin opens.'
+                                  : 'Syncing before closing…',
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          if (failed) ...<Widget>[
+                            const SizedBox(height: 20),
+                            Wrap(
+                              alignment: WrapAlignment.end,
+                              spacing: 8,
+                              runSpacing: 8,
+                              children: <Widget>[
+                                TextButton(
+                                  onPressed: () => onAnswer(false),
+                                  child: Text(
+                                    context.t('Close without syncing'),
+                                  ),
+                                ),
+                                FilledButton(
+                                  autofocus: true,
+                                  onPressed: () => onAnswer(true),
+                                  child: Text(context.t('Retry')),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

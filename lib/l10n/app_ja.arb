@@ -1614,5 +1614,8 @@
   "Some data could not be synced: {items}. MiruShin will retry.": "一部のデータを同期できませんでした: {items}。MiruShinは再試行します。",
   "Syncing watch positions…": "再生位置を同期中…",
   "Watch progress": "視聴の進捗",
-  "Google Drive · Watch progress": "Google Drive · 視聴の進捗"
+  "Google Drive · Watch progress": "Google Drive · 視聴の進捗",
+  "Syncing before closing…": "終了前に同期しています…",
+  "Could not sync your latest changes. They will be sent the next time MiruShin opens.": "最新の変更を同期できませんでした。次回 MiruShin を開いたときに送信されます。",
+  "Close without syncing": "同期せずに閉じる"
 }
