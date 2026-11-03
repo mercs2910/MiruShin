@@ -2359,8 +2359,9 @@ class _PlayerEngineSection extends ConsumerWidget {
           SettingsRow(
             title: 'Плеер на этом устройстве',
             subtitle:
-                'Открывать серии в Vimu или MX Player. Выбор не меняет плеер на Mac.',
+                'Выберите встроенный или внешний плеер. Настройка сохраняется на этом устройстве.',
             trailing: DropdownButton<ExternalPlayer>(
+              isExpanded: true,
               value:
                   ref.watch(externalPlayerProvider).value ??
                   ExternalPlayer.internal,
@@ -2368,7 +2369,11 @@ class _PlayerEngineSection extends ConsumerWidget {
                   .map(
                     (value) => DropdownMenuItem(
                       value: value,
-                      child: Text(value.label),
+                      child: Text(
+                        value.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
                     ),
                   )
                   .toList(growable: false),

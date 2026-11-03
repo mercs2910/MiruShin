@@ -1457,7 +1457,7 @@ class AniListSheetSurface extends StatelessWidget {
           color: palette.surfaceColor,
           border: Border(top: BorderSide(color: palette.borderColor)),
         ),
-        child: child,
+        child: Material(type: MaterialType.transparency, child: child),
       ),
     );
   }

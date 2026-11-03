@@ -38,7 +38,9 @@ class GlassCard extends StatelessWidget {
         borderRadius: AppRadius.all(radius),
         border: Border.all(color: borderColor ?? palette.borderColor),
       ),
-      child: child,
+      // Tiles inside paint their ink on the nearest Material; without this one
+      // it sits under the card background and taps show no feedback.
+      child: Material(type: MaterialType.transparency, child: child),
     );
 
     if (onTap == null) {
