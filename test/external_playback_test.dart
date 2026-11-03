@@ -63,13 +63,14 @@ void main() {
     expect(container.read(externalPlayerProvider).value, ExternalPlayer.vimu);
   });
 
-  testWidgets('normal return saves confirmed position before leaving MiruShin', (tester) async {
+  test('normal return saves confirmed position before leaving MiruShin', () async {
     var snapshot = <String, dynamic>{
       'observed': false, 'active': true, 'returned': false, 'completed': false,
       'positionMs': 250000, 'durationMs': 0,
     };
     final calls = <MethodCall>[];
     final persisted = Completer<void>();
+    final returnStarted = Completer<void>();
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(ExternalPlaybackBridge.channel, (call) async {
           calls.add(call);
@@ -81,38 +82,39 @@ void main() {
       context: const {}, prepare: () async {}, onReturn: (engine) async {
         expect(engine.value.position.inMilliseconds, 876000);
         expect(engine.explicitCompletion, isFalse);
+        returnStarted.complete();
         await persisted.future;
       });
+    addTearDown(engine.dispose);
     final commands = <PlayerEngineUiCommand>[];
     final subscription = engine.uiCommands.listen(commands.add);
     await engine.open(const PlayerSource(url: 'https://example.com/11.m3u8'), startAt: const Duration(seconds: 250));
     expect((calls.first.arguments as Map)['positionMs'], 250000);
-    await tester.pump(const Duration(seconds: 1));
     expect(engine.value.isInitialized, isFalse); // A requested position is not playback evidence.
     snapshot = {...snapshot, 'observed': true, 'active': false, 'returned': true,
       'positionMs': 876000, 'durationMs': 1400000};
-    await tester.pump(const Duration(seconds: 1));
+    await returnStarted.future.timeout(const Duration(seconds: 3));
     expect(commands, isEmpty);
+    final exit = engine.uiCommands.first;
     persisted.complete();
-    await tester.pump();
-    expect(commands, [PlayerEngineUiCommand.exitPlayer]);
+    expect(await exit.timeout(const Duration(seconds: 3)), PlayerEngineUiCommand.exitPlayer);
     await engine.dispose();
     await subscription.cancel();
   });
 
-  testWidgets('explicit external completion works without inventing a duration', (tester) async {
+  test('explicit external completion works without inventing a duration', () async {
     TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(ExternalPlaybackBridge.channel, (call) async => call.method == 'state'
           ? {'observed': true, 'active': false, 'returned': true, 'completed': true,
              'positionMs': 0, 'durationMs': 0} : null);
     addTearDown(() => TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
         .setMockMethodCallHandler(ExternalPlaybackBridge.channel, null));
-    var saved = false;
+    final saved = Completer<void>();
     final engine = ExternalPlayerEngine(target: ExternalPlayer.vimu, title: 'Episode 11',
-      context: const {}, prepare: () async {}, onReturn: (_) async { saved = true; });
+      context: const {}, prepare: () async {}, onReturn: (_) async { saved.complete(); });
+    addTearDown(engine.dispose);
     await engine.open(const PlayerSource(url: 'https://example.com/11.m3u8'));
-    await tester.pump(const Duration(seconds: 1));
-    expect(saved, isTrue);
+    await saved.future.timeout(const Duration(seconds: 3));
     expect(engine.explicitCompletion, isTrue);
     expect(engine.value.duration, Duration.zero);
     await engine.dispose();

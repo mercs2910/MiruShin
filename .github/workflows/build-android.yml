@@ -72,7 +72,7 @@ jobs:
         if: ${{ inputs.diagnostic }}
         run: |
           flutter analyze --no-fatal-infos --no-fatal-warnings
-          flutter test test/external_playback_test.dart test/playback_attempt_plan_test.dart test/auto_skip_test.dart test/player_settings_test.dart
+          flutter test test/external_playback_test.dart test/playback_attempt_plan_test.dart test/auto_skip_test.dart test/player_settings_test.dart test/player_checkpoint_persistence_test.dart test/player_transport_smoothness_test.dart test/player_engine_capability_test.dart test/player_models_test.dart test/player_video_surface_test.dart
 
       - name: Prepare Android version
         id: ver
