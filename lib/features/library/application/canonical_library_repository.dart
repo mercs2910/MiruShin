@@ -5556,6 +5556,19 @@ class CanonicalLibraryRepository {
     return int.tryParse(row?.cursor ?? '') ?? 0;
   }
 
+  Future<DateTime?> lastDriveSnapshotPublishedAt() async {
+    await initialize();
+    final SyncCursorRecord? row =
+        await (database.select(database.syncCursorRecords)..where(
+              (SyncCursorRecords table) =>
+                  table.scope.equals('drive.snapshot.pushedSegmentCount.v1'),
+            ))
+            .getSingleOrNull();
+    return row == null
+        ? null
+        : DateTime.fromMillisecondsSinceEpoch(row.updatedAtMs, isUtc: true);
+  }
+
   /// Record only the count captured before building the published snapshot.
   /// A segment uploaded concurrently remains above this watermark and will
   /// cause another checkpoint on a later full sync.

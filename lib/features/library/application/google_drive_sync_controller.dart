@@ -37,6 +37,20 @@ import 'canonical_library_repository.dart';
 const String _googleDriveLastSyncAtKey = 'google.drive.lastFullSyncAt.v1';
 // Not a silent cut-off: a failed attempt asks the user to retry or close.
 const Duration _exitFlushTimeout = Duration(seconds: 20);
+const Duration _checkpointInterval = Duration(days: 1);
+const int _checkpointSegmentThreshold = 100;
+
+bool driveLibraryCheckpointDue({
+  required int uncheckpointedSegments,
+  required DateTime? lastPublishedAt,
+  required DateTime now,
+  required bool needsBootstrap,
+}) =>
+    needsBootstrap ||
+    (uncheckpointedSegments > 0 &&
+        (uncheckpointedSegments >= _checkpointSegmentThreshold ||
+            lastPublishedAt == null ||
+            now.toUtc().difference(lastPublishedAt) >= _checkpointInterval));
 
 class GoogleDriveSyncState {
   const GoogleDriveSyncState({
@@ -1411,10 +1425,19 @@ class GoogleDriveSyncController extends AsyncNotifier<GoogleDriveSyncState> {
       if (_disposed || _shuttingDown) return;
       _requirePlaybackIdle(cancelToken);
       final int pushedSegmentCount = await repository.pushedDriveSegmentCount();
-      final bool needsCheckpoint =
-          pushedSegmentCount >
-              await repository.checkpointedDriveSegmentCount() ||
-          (restoredEntryCount == null && appliedSnapshotChecksum == null);
+      final int uncheckpointed =
+          pushedSegmentCount - await repository.checkpointedDriveSegmentCount();
+      final DateTime? lastCheckpoint = await repository
+          .lastDriveSnapshotPublishedAt();
+      // Segments already carry every change; the full backup only speeds up a
+      // fresh device. Republishing it per change cost every device ~27 MB.
+      final bool needsCheckpoint = driveLibraryCheckpointDue(
+        uncheckpointedSegments: uncheckpointed,
+        lastPublishedAt: lastCheckpoint,
+        now: DateTime.now(),
+        needsBootstrap:
+            restoredEntryCount == null && appliedSnapshotChecksum == null,
+      );
       // Tracker delivery has its own background queue. Waiting for every
       // AniList/MAL/Shikimori request here can hold the Drive UI at 377/377
       // for hours even though all local segments are already uploaded.

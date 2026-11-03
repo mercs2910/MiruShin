@@ -1360,6 +1360,7 @@ void main() {
     test(
       'Drive checkpoint watermark survives later segment deliveries',
       () async {
+        expect(await repository.lastDriveSnapshotPublishedAt(), isNull);
         expect(await repository.pushedDriveSegmentCount(), 0);
         expect(await repository.checkpointedDriveSegmentCount(), 0);
 
@@ -1383,6 +1384,7 @@ void main() {
         expect(await repository.checkpointedDriveSegmentCount(), 0);
 
         // A full sync captures this watermark before building its backup.
+        expect(await repository.lastDriveSnapshotPublishedAt(), isNull);
         final int captured = await repository.pushedDriveSegmentCount();
         final UserMediaState edited = _state(progress: 3);
         await repository.commitTrackingMutation(
@@ -1401,6 +1403,9 @@ void main() {
           remoteFileId: 'second',
         );
         await repository.markDriveSnapshotPublished(captured);
+        final publishedAt = await repository.lastDriveSnapshotPublishedAt();
+        expect(publishedAt, isNotNull);
+        expect(publishedAt!.isUtc, isTrue);
         expect(await repository.pushedDriveSegmentCount(), 2);
         expect(await repository.checkpointedDriveSegmentCount(), 1);
 
@@ -1409,6 +1414,7 @@ void main() {
         );
         expect(await reopened.pushedDriveSegmentCount(), 2);
         expect(await reopened.checkpointedDriveSegmentCount(), 1);
+        expect(await reopened.lastDriveSnapshotPublishedAt(), publishedAt);
       },
     );
 
