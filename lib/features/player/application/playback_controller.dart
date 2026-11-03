@@ -37,6 +37,7 @@ import '../engine/seek_thumbnail.dart';
 import '../engine/seek_thumbnail_extractor.dart';
 import '../engine/seek_thumbnail_source.dart';
 import '../engine/stream_url_policy.dart';
+import '../engine/video_player_engine.dart';
 import 'external_playback.dart';
 import 'playback_activity.dart';
 import 'player_settings.dart';
@@ -1238,13 +1239,15 @@ class PlaybackController extends Notifier<PlaybackState> {
     final bool softwareDecoding = external == ExternalPlayer.internalSoftware;
     final bool hardwareCopyBack =
         external == ExternalPlayer.internalHardwareCopy;
+    final bool androidPlayer = external == ExternalPlayer.internalAndroid;
     final bool externalPlayback =
         external != ExternalPlayer.internal &&
         !softwareDecoding &&
-        !hardwareCopyBack;
+        !hardwareCopyBack &&
+        !androidPlayer;
     final List<PlaybackAttempt> attempts = youtubeEmbed
         ? const <PlaybackAttempt>[]
-        : externalPlayback
+        : externalPlayback || androidPlayer
         ? const <PlaybackAttempt>[
             PlaybackAttempt(
               backend: PlayerBackend.auto,
@@ -1297,7 +1300,7 @@ class PlaybackController extends Notifier<PlaybackState> {
     _seekThumbnailPlan = thumbnailPlan;
     _seekThumbnailBackend = thumbnailBackend;
     PlayerDiagnostics.instance.record('controller.open', {
-      'backend': engineBackend.name,
+      'backend': androidPlayer ? 'android' : engineBackend.name,
       'route': disableProxy ? 'direct' : 'proxy',
       'attempt': attemptIndex + 1,
       'generation': generation,
@@ -1331,6 +1334,10 @@ class PlaybackController extends Notifier<PlaybackState> {
               await _saveProgress(item, engine);
               await recoverExternalPlayback(ref, returned: true);
             },
+          )
+        : androidPlayer
+        ? VideoPlayerEngine(
+            initialAspectRatio: _safeAspectRatio(preserveAspectRatio),
           )
         : ref.read(playerEngineBuilderProvider)(
             initialAspectRatio: _safeAspectRatio(preserveAspectRatio),

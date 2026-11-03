@@ -26,6 +26,9 @@ class VideoPlayerEngine extends PlayerEngine {
   ValueListenable<PlayerEngineState> get state => _state;
 
   @override
+  bool get managesInitialPosition => true;
+
+  @override
   void addListener(VoidCallback listener) => _state.addListener(listener);
 
   @override
@@ -65,6 +68,11 @@ class VideoPlayerEngine extends PlayerEngine {
       uri,
       formatHint: _formatHint(source),
       httpHeaders: source.headers,
+      // Android's native SurfaceView keeps decoded frames out of Flutter's
+      // texture-copy path. Other platforms retain their existing rendering.
+      viewType: !kIsWeb && defaultTargetPlatform == TargetPlatform.android
+          ? VideoViewType.platformView
+          : VideoViewType.textureView,
       videoPlayerOptions: VideoPlayerOptions(
         webOptions: const VideoPlayerWebOptions(allowContextMenu: false),
       ),
@@ -182,6 +190,7 @@ class VideoPlayerEngine extends PlayerEngine {
         isInitialized: value.isInitialized,
         isPlaying: value.isPlaying,
         isBuffering: value.isBuffering,
+        isCompleted: value.isCompleted,
         hasVideoSurface: value.isInitialized,
         hasError: value.hasError,
         errorDescription: value.errorDescription,

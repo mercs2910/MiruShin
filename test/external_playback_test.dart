@@ -108,6 +108,18 @@ void main() {
         '{"playerBackend":"auto"}',
       );
       expect(container.read(externalPlayerProvider).value, ExternalPlayer.vimu);
+      await container
+          .read(externalPlayerProvider.notifier)
+          .select(ExternalPlayer.internalAndroid);
+      container.invalidate(externalPlayerProvider);
+      expect(
+        await container.read(externalPlayerProvider.future),
+        ExternalPlayer.internalAndroid,
+      );
+      expect(
+        prefs.getString('mirushin.player.settings'),
+        '{"playerBackend":"auto"}',
+      );
     },
   );
 

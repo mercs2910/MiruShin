@@ -98,6 +98,7 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   sqflite_common_ffi: ^2.4.0+3
+  video_player_platform_interface: ^6.7.0
 
 flutter_native_splash:
   color: "#0a0011"
