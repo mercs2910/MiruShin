@@ -1236,9 +1236,12 @@ class PlaybackController extends Notifier<PlaybackState> {
         : await ref.read(externalPlayerProvider.future);
     if (generation != _playbackGeneration) return;
     final bool softwareDecoding = external == ExternalPlayer.internalSoftware;
-    final bool hardwareCopyBack = external == ExternalPlayer.internalHardwareCopy;
+    final bool hardwareCopyBack =
+        external == ExternalPlayer.internalHardwareCopy;
     final bool externalPlayback =
-        external != ExternalPlayer.internal && !softwareDecoding && !hardwareCopyBack;
+        external != ExternalPlayer.internal &&
+        !softwareDecoding &&
+        !hardwareCopyBack;
     final List<PlaybackAttempt> attempts = youtubeEmbed
         ? const <PlaybackAttempt>[]
         : externalPlayback

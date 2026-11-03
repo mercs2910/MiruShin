@@ -61,6 +61,10 @@ void main() {
     debugDefaultTargetPlatformOverride = TargetPlatform.windows;
     addTearDown(() => debugDefaultTargetPlatformOverride = null);
     binding.defaultBinaryMessenger.setMockMethodCallHandler(
+      windowChannel,
+      (call) async => false,
+    );
+    binding.defaultBinaryMessenger.setMockMethodCallHandler(
       ExternalPlaybackBridge.channel,
       (call) async => null,
     );
@@ -122,14 +126,20 @@ void main() {
     expect(controller.stopCalls, 0);
     // A result can arrive after the engine is published, before any rebuild.
     controller.attachEngine();
+    expect(engine.hasCommandListener, isTrue);
     engine.returnToMiruShin();
-    for (var i = 0; i < 30 && find.byType(PlayerPage).evaluate().isNotEmpty; i++) {
+    for (
+      var i = 0;
+      i < 30 && find.byType(PlayerPage).evaluate().isNotEmpty;
+      i++
+    ) {
       await tester.pump(const Duration(milliseconds: 100));
     }
     expect(find.byType(PlayerPage), findsNothing);
     expect(controller.stopCalls, 1);
     await tester.pumpWidget(const SizedBox.shrink());
     await tester.pump(const Duration(seconds: 3));
+    debugDefaultTargetPlatformOverride = null;
   });
 
   test('desktop continuation inherits the last actual fullscreen state', () {
@@ -599,16 +609,20 @@ void main() {
 }
 
 class _ReturnTestEngine extends ExternalPlayerEngine {
-  _ReturnTestEngine() : super(
-    target: ExternalPlayer.vimu,
-    title: 'Episode 11',
-    context: const {},
-    prepare: () async {},
-    onReturn: (_) async {},
+  _ReturnTestEngine()
+    : super(
+        target: ExternalPlayer.vimu,
+        title: 'Episode 11',
+        context: const {},
+        prepare: () async {},
+        onReturn: (_) async {},
+      );
+  final _commands = StreamController<PlayerEngineUiCommand>.broadcast(
+    sync: true,
   );
-  final _commands = StreamController<PlayerEngineUiCommand>.broadcast(sync: true);
   @override
   Stream<PlayerEngineUiCommand> get uiCommands => _commands.stream;
+  bool get hasCommandListener => _commands.hasListener;
   void returnToMiruShin() => _commands.add(PlayerEngineUiCommand.exitPlayer);
   @override
   Future<void> dispose() async {

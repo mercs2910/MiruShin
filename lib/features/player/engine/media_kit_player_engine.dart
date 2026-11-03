@@ -228,7 +228,9 @@ class MediaKitPlayerEngine extends PlayerEngine {
     final mkv.VideoController videoController = mkv.VideoController(
       player,
       configuration: mkv.VideoControllerConfiguration(
-        hwdec: softwareVideoOutput || (Platform.isAndroid && source.hardwareCopyBack)
+        hwdec:
+            softwareVideoOutput ||
+                (Platform.isAndroid && source.hardwareCopyBack)
             ? _hwdecFor(source)
             : null,
         enableHardwareAcceleration: !softwareVideoOutput,
@@ -451,8 +453,13 @@ class MediaKitPlayerEngine extends PlayerEngine {
     _samplingNativeDiagnostics = true;
     try {
       final values = <String, Object?>{};
-      for (final property in const ['hwdec-current', 'video-format',
-        'frame-drop-count', 'decoder-frame-drop-count', 'avsync']) {
+      for (final property in const [
+        'hwdec-current',
+        'video-format',
+        'frame-drop-count',
+        'decoder-frame-drop-count',
+        'avsync',
+      ]) {
         try {
           values[property] = await native.getProperty(property);
         } on Object {
@@ -521,11 +528,7 @@ class MediaKitPlayerEngine extends PlayerEngine {
       if (!bufferOnly) ('hr-seek-framedrop', 'no'),
 
       // Hardware decoding
-      if (!bufferOnly)
-        (
-          'hwdec',
-          _hwdecFor(source),
-        ),
+      if (!bufferOnly) ('hwdec', _hwdecFor(source)),
     ];
 
     if (isNetwork && !bufferOnly) {
