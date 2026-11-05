@@ -70,7 +70,13 @@ class MiruShinDeepLinkService {
         if (setCatalogMode != null) {
           unawaited(setCatalogMode(catalogModeForMediaDeepLink(link)));
         }
-        router.go(AppRoutes.mediaDetailsPath(link.internalMediaId));
+        final int? episode = link.episode;
+        router.go(
+          episode == null
+              ? AppRoutes.mediaDetailsPath(link.internalMediaId)
+              : '${AppRoutes.watchPath(link.internalMediaId)}'
+                    '?episode=$episode&activation=$_activation',
+        );
       case MiruShinWatchPartyDeepLink():
         router.go(
           '${AppRoutes.watchPartyJoin}?activation=$_activation',

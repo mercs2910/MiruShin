@@ -42,6 +42,9 @@ void main() {
         'https://anilist.co/anime/21',
         'mirushin://anilist/anime/0',
         'mirushin://anilist/anime/-1',
+        'mirushin://anilist/anime/116674/episode/0',
+        'mirushin://anilist/anime/116674/episode/11?stream=anything',
+        'mirushin://anilist/manga/116674/episode/11',
         'mirushin://anilist/movie/21',
         'mirushin://tmdb/anime/21',
         'mirushin://tmdb/movie/21?catalog=tmdb',
@@ -64,6 +67,15 @@ void main() {
       ]) {
         expect(MiruShinDeepLink.tryParse(value), isNull, reason: value);
       }
+    });
+
+    test('parses an episode without changing the canonical anime identity', () {
+      const String url = 'mirushin://anilist/anime/116674/episode/11';
+      final link = MiruShinDeepLink.tryParse(url)! as MiruShinMediaDeepLink;
+      expect(link.internalMediaId, 'anilist:116674');
+      expect(link.episode, 11);
+      expect(link.deduplicationKey, url);
+      expect(catalogModeForMediaDeepLink(link), CatalogMode.anilist);
     });
 
     test('generates exact provider links without a catalog parameter', () {

@@ -159,10 +159,16 @@ class _PreparedOnlineAdvance {
 }
 
 class WatchPage extends ConsumerStatefulWidget {
-  const WatchPage({required this.id, this.initialItem, super.key});
+  const WatchPage({
+    required this.id,
+    this.initialItem,
+    this.initialEpisode,
+    super.key,
+  });
 
   final String id;
   final MediaItem? initialItem;
+  final int? initialEpisode;
 
   @override
   ConsumerState<WatchPage> createState() => _WatchPageState();
@@ -213,6 +219,10 @@ class _WatchPageState extends ConsumerState<WatchPage> {
   SoraSourceRequest? _sourceEpisodesRequest;
   Future<List<SoraEpisode>>? _sourceEpisodesFuture;
   List<SoraEpisode>? _sourceEpisodes;
+  late int? _pendingLinkedEpisode = widget.initialEpisode;
+  bool _resolvingLinkedEpisode = false;
+  String? _preferredAddonId;
+  bool _linkedPreferencesReady = false;
 
   @override
   void didUpdateWidget(covariant WatchPage oldWidget) {
@@ -226,6 +236,8 @@ class _WatchPageState extends ConsumerState<WatchPage> {
     _sourceEpisodesRequest = null;
     _sourceEpisodesFuture = null;
     _sourceEpisodes = null;
+    _pendingLinkedEpisode = widget.initialEpisode;
+    _resolvingLinkedEpisode = false;
     _continueEpisode = null;
     _continueEpisodeMeta = null;
     _playerPlaybackGeneration++;
@@ -265,6 +277,8 @@ class _WatchPageState extends ConsumerState<WatchPage> {
     _preferredQualityLabel = null;
     _preferredVoiceOverId = null;
     _preferredVoiceOverLabel = null;
+    _preferredAddonId = null;
+    _linkedPreferencesReady = false;
     _preferredPlaybackRoute = null;
     _streamPreferenceScope = null;
     _streamPreferenceLoad = null;
@@ -297,8 +311,20 @@ class _WatchPageState extends ConsumerState<WatchPage> {
           _preferredServerTitle = _nonEmpty(preference.serverTitle);
           _preferredQualityId = _nonEmpty(preference.qualityId);
           _preferredQualityLabel = _nonEmpty(preference.qualityLabel);
+          if (widget.initialEpisode != null) {
+            _preferredAddonId = _nonEmpty(preference.addonId);
+            _preferredVoiceOverId = _nonEmpty(preference.voiceoverId);
+            _preferredVoiceOverLabel = _nonEmpty(preference.voiceoverTitle);
+          }
         })
-        .catchError((Object _) {});
+        .catchError((Object _) {})
+        .whenComplete(() {
+          if (mounted &&
+              _streamPreferenceScope == scope &&
+              _pendingLinkedEpisode != null) {
+            setState(() => _linkedPreferencesReady = true);
+          }
+        });
     _streamPreferenceLoad = load;
     return load;
   }
@@ -464,6 +490,7 @@ class _WatchPageState extends ConsumerState<WatchPage> {
             if (sourceSeasonFlow && groups.length <= 1) {
               _scrollToKey(_episodeKey);
             }
+            _openLinkedEpisode(request, episodes);
           })
           .catchError((Object _) {
             if (!mounted || !_isCurrentSourceEpisodeRequest(request)) return;
@@ -479,6 +506,70 @@ class _WatchPageState extends ConsumerState<WatchPage> {
     return current != null &&
         current.addonId == request.addonId &&
         current.result.href == request.result.href;
+  }
+
+  void _findLinkedEpisodeSource(MediaItem item) {
+    final List<SoraInstalledAddon> addons = ref
+        .watch(soraAddonsProvider)
+        .enabledOrdered;
+    final List<String> languages = ref.watch(soraSourceLanguagesProvider);
+    if (languages.isEmpty) return;
+
+    final String? preferred = _preferredAddonId;
+    for (final SoraInstalledAddon addon in <SoraInstalledAddon>[
+      ...addons.where((SoraInstalledAddon addon) => addon.id == preferred),
+      ...addons.where((SoraInstalledAddon addon) => addon.id != preferred),
+    ]) {
+      final AsyncValue<SoraSourceSearchBundle> search = ref.watch(
+        soraSourceSearchProvider(
+          SoraSourceSearchRequest(
+            media: item,
+            languageCodes: languages,
+            addonId: addon.id,
+          ),
+        ),
+      );
+      if (search.isLoading) return;
+      final List<SoraSearchResult> exact =
+          (search.asData?.value.results ?? const <SoraSearchResult>[])
+              .where((SoraSearchResult result) => result.score == 1)
+              .toList();
+      if (exact.length != 1) continue;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted &&
+            _pendingLinkedEpisode != null &&
+            _session?.source == null) {
+          _pickSource(exact.single);
+        }
+      });
+      return;
+    }
+  }
+
+  Future<void> _openLinkedEpisode(
+    SoraSourceRequest request,
+    List<SoraEpisode> episodes,
+  ) async {
+    final int? number = _pendingLinkedEpisode;
+    final MediaItem? item = _lastItem;
+    if (number == null || item == null) return;
+    final List<SoraEpisode> matches = episodes
+        .where((SoraEpisode episode) => episode.number == number)
+        .toList();
+    if (matches.length != 1) return;
+    final SoraEpisode episode = matches.single;
+    final AnimeEpisodeMetadata? metadata = await _metadataForAutoNext(
+      item,
+      episode,
+    );
+    if (mounted &&
+        _pendingLinkedEpisode == number &&
+        _isCurrentSourceEpisodeRequest(request)) {
+      _pickEpisode(
+        _episodeForPlayback(episode, metadata, null),
+        fromLink: true,
+      );
+    }
   }
 
   void _pickSourceSeason(int seasonNumber) {
@@ -504,9 +595,12 @@ class _WatchPageState extends ConsumerState<WatchPage> {
   void _pickEpisode(
     SoraEpisode episode, {
     bool isAutoNext = false,
+    bool fromLink = false,
     int? transitionId,
     int resolutionAttempt = 1,
   }) {
+    _pendingLinkedEpisode = null;
+    _resolvingLinkedEpisode = fromLink;
     if (!isAutoNext) {
       _retryPendingAdvance = null;
       _pendingAdvanceTarget = null;
@@ -577,7 +671,10 @@ class _WatchPageState extends ConsumerState<WatchPage> {
 
     final bool canAutoPlay =
         resolvedBundle.activeUrl.trim().isNotEmpty &&
-        (isAutoNext || !_bundleRequiresManualChoice(resolvedBundle));
+        (isAutoNext ||
+            _resolvingLinkedEpisode ||
+            !_bundleRequiresManualChoice(resolvedBundle));
+    _resolvingLinkedEpisode = false;
     if (isAutoNext && !canAutoPlay) {
       _failOnlineAdvance(
         claim.transitionId!,
@@ -1812,6 +1909,13 @@ class _WatchPageState extends ConsumerState<WatchPage> {
     }
 
     final WatchSession? session = _session;
+    if (item != null &&
+        _linkedPreferencesReady &&
+        _pendingLinkedEpisode != null &&
+        session?.step == WatchStep.pickSource &&
+        session?.source == null) {
+      _findLinkedEpisodeSource(_seasonSearchItem(item, session!));
+    }
     if (item != null) {
       _debugWatchSeasonState(
         item: item,

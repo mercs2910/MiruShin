@@ -1,0 +1,4 @@
+<searchable xmlns:android="http://schemas.android.com/apk/res/android"
+    android:label="@string/tv_search_label"
+    android:searchSuggestAuthority="@string/tv_search_authority"
+    android:searchSuggestIntentAction="android.intent.action.VIEW" />

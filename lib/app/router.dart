@@ -234,6 +234,10 @@ GoRouter buildAppRouter(String initialLocation) => GoRouter(
               state,
               WatchPage(
                 id: id,
+                key: ValueKey<String?>(state.uri.queryParameters['activation']),
+                initialEpisode: int.tryParse(
+                  state.uri.queryParameters['episode'] ?? '',
+                ),
                 initialItem: state.extra is MediaItem
                     ? state.extra! as MediaItem
                     : null,

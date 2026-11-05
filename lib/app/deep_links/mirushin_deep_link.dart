@@ -46,10 +46,25 @@ sealed class MiruShinDeepLink {
     if (uri.hasQuery || uri.hasFragment || uri.userInfo.isNotEmpty) return null;
     final String provider = uri.host.toLowerCase();
     final List<String> segments = uri.pathSegments;
-    if (segments.length != 2) return null;
+    if (segments.length != 2 && segments.length != 4) return null;
     final int? numericId = int.tryParse(segments[1]);
     if (!_isValidMediaId(numericId)) return null;
 
+    if (segments.length == 4) {
+      if (provider != 'anilist' ||
+          segments[0] != 'anime' ||
+          segments[2] != 'episode') {
+        return null;
+      }
+      final int? episode = int.tryParse(segments[3]);
+      if (!_isValidMediaId(episode)) return null;
+      return MiruShinMediaDeepLink(
+        provider: MiruShinMediaProvider.anilist,
+        kind: MiruShinMediaKind.anime,
+        numericId: numericId!,
+        episode: episode,
+      );
+    }
     return _mediaLinkForRoute(provider, segments[0], numericId!);
   }
 
@@ -106,11 +121,13 @@ class MiruShinMediaDeepLink extends MiruShinDeepLink {
     required this.provider,
     required this.kind,
     required this.numericId,
+    this.episode,
   });
 
   final MiruShinMediaProvider provider;
   final MiruShinMediaKind kind;
   final int numericId;
+  final int? episode;
 
   String get internalMediaId => switch ((provider, kind)) {
     (MiruShinMediaProvider.anilist, MiruShinMediaKind.anime) =>
@@ -126,7 +143,11 @@ class MiruShinMediaDeepLink extends MiruShinDeepLink {
   Uri get uri => Uri(
     scheme: 'mirushin',
     host: provider.name,
-    pathSegments: <String>[kind.name, numericId.toString()],
+    pathSegments: <String>[
+      kind.name,
+      numericId.toString(),
+      if (episode case final int number) ...<String>['episode', '$number'],
+    ],
   );
 
   Uri get providerUri => switch ((provider, kind)) {
