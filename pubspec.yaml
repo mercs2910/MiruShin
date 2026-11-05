@@ -64,6 +64,7 @@ dependencies:
   url_launcher: ^6.3.2
   uuid: ^4.5.3
   video_player: ^2.11.1
+  video_player_platform_interface: ^6.7.0
   wakelock_plus: ^1.5.2
   web_socket_channel: ^3.0.3
   webview_flutter: ^4.13.1
@@ -98,7 +99,6 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   sqflite_common_ffi: ^2.4.0+3
-  video_player_platform_interface: ^6.7.0
 
 flutter_native_splash:
   color: "#0a0011"
