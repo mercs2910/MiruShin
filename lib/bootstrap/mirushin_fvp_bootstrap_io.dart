@@ -1,12 +1,16 @@
 import 'dart:io';
 
 import 'package:fvp/fvp.dart' as fvp;
+import 'package:video_player_platform_interface/video_player_platform_interface.dart';
 
 /// Register FVP once with MiruShin-friendly native defaults.
 ///
 /// Keep the global defaults moderate. FvpPlayerEngine applies stronger
 /// per-source/per-speed cache settings before opening each stream.
 void configureMiruShinFvp() {
+  final androidVideoPlayer = Platform.isAndroid
+      ? VideoPlayerPlatform.instance
+      : null;
   fvp.registerWith(
     options: <String, Object>{
       'fastSeek': false,
@@ -33,4 +37,9 @@ void configureMiruShinFvp() {
       },
     },
   );
+  // Keep MDK configured for the direct FVP engine and use the stock Media3
+  // plugin for Android's VideoPlayerController.
+  if (androidVideoPlayer != null) {
+    VideoPlayerPlatform.instance = androidVideoPlayer;
+  }
 }
